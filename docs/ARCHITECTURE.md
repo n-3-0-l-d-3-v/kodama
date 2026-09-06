@@ -2,7 +2,7 @@
 
 ## Overview
 
-Proximity OS is layered so the riskiest code (radios, peer-supplied bytes)
+Kodama is layered so the riskiest code (radios, peer-supplied bytes)
 sits farthest from the UI, and nothing crosses between them without passing
 through the Guardrail Engine.
 

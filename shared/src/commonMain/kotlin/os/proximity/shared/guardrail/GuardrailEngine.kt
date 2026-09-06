@@ -1,7 +1,7 @@
 package os.proximity.shared.guardrail
 
 /**
- * The single mediation point for every sensitive action in Proximity OS.
+ * The single mediation point for every sensitive action in Kodama.
  *
  * Every inbound frame from the transport/mesh layer and every outbound
  * action initiated by the UI or shared logic must be evaluated here before

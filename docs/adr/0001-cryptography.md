@@ -5,7 +5,7 @@ Date: 2026-08-27
 
 ## Context
 
-Proximity OS exchanges data between phones that have never met, over a
+Kodama exchanges data between phones that have never met, over a
 radio anyone in range can listen to, with no server and no certificate
 authority. We need device identity, an encrypted channel, and a handshake
 that binds one to the other — using primitives that actually exist on

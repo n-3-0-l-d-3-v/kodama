@@ -158,7 +158,7 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
             TopAppBar(
                 title = {
                     Text(
-                        text = openConversation?.peerLabel ?: openList?.name ?: "Proximity OS",
+                        text = openConversation?.peerLabel ?: openList?.name ?: "Kodama",
                         fontWeight = FontWeight.SemiBold
                     )
                 },
@@ -300,7 +300,7 @@ private fun PermissionScreen(onRequest: () -> Unit) {
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            "Proximity OS uses Bluetooth to find phones near you. It does not use this " +
+            "Kodama uses Bluetooth to find phones near you. It does not use this " +
                 "for location, and nothing is shared until you approve a connection.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,

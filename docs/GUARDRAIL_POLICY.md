@@ -1,7 +1,7 @@
 # Guardrail Policy Design
 
 The Guardrail Engine is the single mediation point for every sensitive
-action in Proximity OS, inbound or outbound. This document describes the
+action in Kodama, inbound or outbound. This document describes the
 policy model it evaluates.
 
 ## Goals

@@ -74,7 +74,7 @@ class MeshForegroundService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Proximity OS is running")
+            .setContentTitle("Kodama is running")
             .setContentText("Looking for nearby devices. Nothing is shared without your approval.")
             .setSmallIcon(R.drawable.ic_mesh_notification)
             .setOngoing(true)
@@ -98,7 +98,7 @@ class MeshForegroundService : Service() {
                 // interrupt the user with.
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Shown while Proximity OS is looking for nearby devices."
+                description = "Shown while Kodama is looking for nearby devices."
                 setShowBadge(false)
             }
         )

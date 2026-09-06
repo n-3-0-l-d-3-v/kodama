@@ -152,3 +152,20 @@ listed here — this tracks meaningful progress, not every file touched.
 - On Android 13+, notification permission is requested when the user opts
   in, because that notification *is* the disclosure that the radio is
   running.
+
+## Renamed: Proximity OS → Kodama
+
+- Project renamed to **Kodama** (木霊) — Japanese for both a spirit said to
+  answer back from within a tree, and the ordinary word for *echo*. The
+  mesh forms only where devices are close enough to hear each other and
+  disappears when they're not, which is the whole naming rationale in one
+  word.
+- GitHub repository renamed to `kodama`, with a description added.
+- User-facing name updated throughout the README, docs, and in-app strings
+  (onboarding, app bar, notification).
+- Gradle root project renamed to `kodama`.
+- **Not renamed yet**: Kotlin package names (`os.proximity.*`), the
+  `os.proximity.android` application ID, and directory paths. That's a
+  larger, purely mechanical change touching ~50 files across a module I
+  cannot fully compile-verify here, so it's deferred as a deliberate,
+  separately-reviewed follow-up rather than done blind.

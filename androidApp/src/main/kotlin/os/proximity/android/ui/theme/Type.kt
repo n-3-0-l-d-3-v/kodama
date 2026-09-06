@@ -7,7 +7,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 
 /**
- * Type scale. Deliberately restrained: Proximity OS shows security-relevant
+ * Type scale. Deliberately restrained: Kodama shows security-relevant
  * text, so line height and weight are tuned for scanning a list of decisions
  * quickly rather than for visual flourish.
  */

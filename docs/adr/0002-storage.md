@@ -6,7 +6,7 @@ Supersedes the SQLDelight choice in the original stack decision.
 
 ## Context
 
-Proximity OS must persist three things across restarts:
+Kodama must persist three things across restarts:
 
 1. The **audit log** — the record of every Guardrail decision.
 2. The **trust store** — which peers the user has verified in person.

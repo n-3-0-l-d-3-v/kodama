@@ -3,7 +3,7 @@ package os.proximity.shared.storage
 /**
  * Minimal persistence surface.
  *
- * Deliberately small and text-oriented: everything Proximity OS stores is
+ * Deliberately small and text-oriented: everything Kodama stores is
  * either a short document or an append-only log, and keeping the platform
  * contract this thin means the storage *logic* (compaction, bounding,
  * recovery from corruption) lives in shared code where it is testable.

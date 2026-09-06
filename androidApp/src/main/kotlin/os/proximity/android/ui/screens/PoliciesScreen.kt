@@ -91,7 +91,7 @@ fun PoliciesScreen(
         item {
             SimpleToggleRow(
                 title = "Keep the mesh running when I leave the app",
-                explanation = "Off by default. Turned on, Proximity OS keeps looking for " +
+                explanation = "Off by default. Turned on, Kodama keeps looking for " +
                     "nearby devices with a notification showing, and uses more battery. " +
                     "Turned off, it only runs while you have the app open.",
                 enabled = runInBackground,

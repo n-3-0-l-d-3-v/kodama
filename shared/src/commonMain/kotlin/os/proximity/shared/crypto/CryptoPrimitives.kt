@@ -11,7 +11,7 @@ class EcdhKeyPair(
 )
 
 /**
- * The minimum set of primitives Proximity OS needs from the platform.
+ * The minimum set of primitives Kodama needs from the platform.
  *
  * This surface is deliberately small. Everything that can be expressed as
  * composition of these primitives — key derivation, the handshake

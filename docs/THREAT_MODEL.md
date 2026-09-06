@@ -148,7 +148,7 @@ that key, so an attacker who relays between two parties — presenting their
 own key to each — completes a valid handshake with both.
 
 This is not solvable by cryptography alone without a trust anchor, and
-Proximity OS deliberately has no central authority. It is closed by
+Kodama deliberately has no central authority. It is closed by
 **out-of-band verification**: the short fingerprint compared in person.
 
 Accordingly:

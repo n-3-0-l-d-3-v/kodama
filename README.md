@@ -1,6 +1,12 @@
-# Proximity OS
+# Kodama
 
-Proximity OS is a temporary, local coordination layer that forms
+**木霊 (kodama)** — in Japanese folklore, a spirit said to live in old trees
+and answer back when you call into the forest; the same word is also the
+ordinary Japanese noun for *echo*. Both meanings fit: this app forms only
+where devices are close enough to hear each other, answers back, and
+disappears the moment they're not.
+
+Kodama is a temporary, local coordination layer that forms
 automatically between nearby smartphones. Devices discover each other over
 Bluetooth LE, prove who they are, open an encrypted channel, and exchange
 data — with no internet, no account, and no server anywhere.
@@ -18,7 +24,7 @@ every decision is written to a local audit log the user can read.
 ## Why
 
 Existing mesh and offline messengers optimise for reachability and treat
-safety as an afterthought. Proximity OS starts from the opposite
+safety as an afterthought. Kodama starts from the opposite
 assumption: **default deny**, every block explained in plain language, and
 every decision recorded where the user can check it.
 
@@ -109,7 +115,7 @@ tested code.
 ## Project layout
 
 ```
-proximity-os/
+kodama/
 ├── shared/          # KMP core
 │   └── src/commonMain/kotlin/os/proximity/shared/
 │       ├── capability/ # what a device offers, and for how long

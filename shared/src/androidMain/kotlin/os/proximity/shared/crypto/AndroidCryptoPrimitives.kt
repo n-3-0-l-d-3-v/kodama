@@ -16,7 +16,7 @@ import javax.crypto.spec.SecretKeySpec
  * JCA-backed [CryptoPrimitives].
  *
  * Curve choice is P-256 rather than X25519: X25519 only reached the Android
- * platform providers in API 33, and Proximity OS targets API 26+. P-256
+ * platform providers in API 33, and Kodama targets API 26+. P-256
  * ECDH has been available and hardware-accelerated for far longer. See
  * docs/adr/0001-cryptography.md.
  */

@@ -213,7 +213,7 @@ class BleMeshTransport(context: Context) : MeshTransport {
                             ?.getCharacteristic(INBOX_CHARACTERISTIC_UUID)
                         if (characteristic == null) {
                             // Advertised our service UUID but doesn't implement
-                            // it — not a Proximity OS peer we can talk to.
+                            // it — not a Kodama peer we can talk to.
                             if (continuation.isActive) continuation.resume(false)
                             return
                         }
@@ -354,7 +354,7 @@ class BleMeshTransport(context: Context) : MeshTransport {
         private const val CONNECT_TIMEOUT_MILLIS = 20_000L
         private const val WRITE_TIMEOUT_MILLIS = 10_000L
 
-        /** Identifies Proximity OS peers during scanning and advertising. */
+        /** Identifies Kodama peers during scanning and advertising. */
         val SERVICE_UUID: UUID = UUID.fromString("7a4f9b1e-7e0e-4f2a-9b0e-1e2d3c4b5a69")
 
         /** Peers write framed payloads to this characteristic. */

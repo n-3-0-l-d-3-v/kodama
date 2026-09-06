@@ -3,7 +3,7 @@ package os.proximity.android.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * Proximity OS palette.
+ * Kodama palette.
  *
  * The palette is built around a "signal" metaphor: cool blues for the mesh
  * and presence, warm amber for anything awaiting a human decision, and a

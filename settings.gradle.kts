@@ -16,7 +16,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "proximity-os"
+rootProject.name = "kodama"
 
 include(":shared")
 include(":androidApp")

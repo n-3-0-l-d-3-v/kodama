@@ -60,10 +60,10 @@ fun NearbyScreen(
                 EmptyState(
                     title = if (isScanning) "Looking for devices nearby" else "Nothing nearby yet",
                     body = if (isScanning) {
-                        "Other phones running Proximity OS will appear here as they come into range. " +
+                        "Other phones running Kodama will appear here as they come into range. " +
                             "This is normal — most of the time, there won't be anyone."
                     } else {
-                        "Start scanning to find other phones running Proximity OS within Bluetooth range."
+                        "Start scanning to find other phones running Kodama within Bluetooth range."
                     },
                     actionLabel = if (isScanning) null else "Start scanning",
                     onAction = if (isScanning) null else onToggleScan

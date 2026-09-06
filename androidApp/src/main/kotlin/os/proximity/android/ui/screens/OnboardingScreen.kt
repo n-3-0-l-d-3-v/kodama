@@ -49,7 +49,7 @@ fun OnboardingScreen(
             .padding(28.dp)
     ) {
         Spacer(Modifier.height(32.dp))
-        Text("Proximity OS", style = MaterialTheme.typography.displaySmall)
+        Text("Kodama", style = MaterialTheme.typography.displaySmall)
         Spacer(Modifier.height(10.dp))
         Text(
             "A temporary local network that forms between phones near you. " +
@@ -74,7 +74,7 @@ fun OnboardingScreen(
         PromiseCard(
             title = "What it does",
             promises = listOf(
-                "Finds other Proximity OS phones nearby over Bluetooth",
+                "Finds other Kodama phones nearby over Bluetooth",
                 "Encrypts everything end to end, with keys kept in your phone's secure hardware",
                 "Asks you before accepting a connection from someone new",
                 "Writes down every decision it makes, so you can check it"
