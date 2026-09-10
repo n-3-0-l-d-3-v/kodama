@@ -169,3 +169,24 @@ listed here — this tracks meaningful progress, not every file touched.
   larger, purely mechanical change touching ~50 files across a module I
   cannot fully compile-verify here, so it's deferred as a deliberate,
   separately-reviewed follow-up rather than done blind.
+
+## QR-code verification
+
+- `QrVerificationCodec` (shared, fully tested): encodes an identity public
+  key as `kodama:1:<hex>`, decodes it back, and is fuzz-tested against
+  arbitrary camera input — a QR aimed at a poster or someone else's app
+  must degrade to "not ours," never an exception.
+- Scanning from an open conversation cross-checks the scanned key against
+  that conversation's device ID and refuses to verify on a mismatch, rather
+  than trusting whatever the camera saw.
+- Scanning from the Nearby screen with no conversation open pre-authorises
+  whoever the key belongs to — the in-person optical scan is itself the
+  verification (docs/THREAT_MODEL.md #9), closing the gap that manual
+  fingerprint reading left open by being easy to skip or get wrong.
+- First external dependency added to the Android app: ZXing, for QR
+  generation and scanning. Confined to two small files
+  (`verification/QrCode.kt` for rendering, the scan launcher in
+  `ProximityApp.kt`); everything else works with plain strings through the
+  shared codec.
+- Not yet exercised on a device: camera permission, the third-party scanner
+  activity, and the end-to-end scan UI.

@@ -63,6 +63,10 @@ what this app just did, and why?*
   with convergence verified by property tests.
 - Short-lived capability advertisement, filtered and expiry-capped on
   receipt.
+- QR-code verification: scan to confirm a conversation's peer, or
+  pre-authorise a stranger before ever connecting. The codec is fully
+  tested; the on-device scan flow (camera, third-party scanner activity) is
+  not.
 - Conversation history that survives restarts, with bounded retention.
 - An opt-in foreground service so the mesh can keep running when the app is
   not in front.
@@ -75,7 +79,6 @@ what this app just did, and why?*
 - Multi-hop relay and store-and-forward (messages only travel one hop).
 - Encryption at rest for stored data (see docs/adr/0002-storage.md).
 - File transfer.
-- QR-code verification (fingerprints are compared manually today).
 - Wi-Fi Direct/Aware transport.
 - iOS.
 
@@ -110,7 +113,9 @@ and [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md).
 
 No third-party cryptography library — the primitives come from the platform
 and the composition (HKDF, transcripts, session handling) is our own shared,
-tested code.
+tested code. The one external dependency in the Android app is ZXing, for
+generating and scanning QR verification codes — a rendering detail, not a
+security primitive; the codec it renders is our own and is fully tested.
 
 ## Project layout
 
@@ -130,6 +135,7 @@ kodama/
 ├── androidApp/      # Android app
 │   └── src/main/kotlin/os/proximity/android/
 │       ├── mesh/       # BLE transport
+│       ├── verification/ # QR code generation
 │       └── ui/         # screens, components, theme
 └── docs/            # architecture, threat model, policy design, ADRs
 ```

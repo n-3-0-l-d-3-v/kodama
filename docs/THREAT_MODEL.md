@@ -159,8 +159,19 @@ Accordingly:
 - Once verified, substitution is prevented, because the device ID is
   derived from the pinned key.
 
-**Gap:** verification is manual fingerprint comparison. QR scanning is
-planned and would make this far likelier to actually be done.
+**Update:** verification no longer depends solely on reading a fingerprint
+aloud. Either side can show a QR code (`QrVerificationCodec`, encoding their
+identity public key) for the other to scan. Scanning from an open
+conversation cross-checks the scanned key against that conversation's
+device ID and refuses to verify on a mismatch, rather than trusting
+whatever was scanned; scanning from the Nearby screen with no conversation
+open pre-authorises whoever the key belongs to, since the in-person scan
+*is* the verification. Manual fingerprint comparison remains available as
+a fallback for a phone with no camera or a broken scanner.
+
+**Remaining gap:** the codec has full test coverage, but the scan flow
+itself — camera permission, the third-party scanner activity, and the
+UI wiring — has not been exercised on a device.
 
 ## Explicitly out of scope
 
