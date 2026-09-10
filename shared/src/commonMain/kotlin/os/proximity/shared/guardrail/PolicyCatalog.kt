@@ -64,8 +64,10 @@ object PolicyCatalog {
                     matches = { it.actionType == ActionType.RECEIVE_FILE },
                     decide = { request ->
                         if (request.peer?.trustState == TrustState.VERIFIED) {
+                            val name = request.attributes["name"]
+                            val label = if (name != null) "\"$name\"" else "a file"
                             GuardrailDecision.AskUser(
-                                reason = "${request.peer.deviceId.take(8)} wants to send you a file.",
+                                reason = "${request.peer.deviceId.take(8)} wants to send you $label.",
                                 options = listOf("Accept", "Refuse")
                             )
                         } else {

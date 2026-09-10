@@ -82,7 +82,12 @@ class DefaultGuardrailEngine(
             // A stricter posture is available as a user policy rather than
             // being forced here, because refusing to sync with someone you
             // just met would defeat the feature.
-            ActionType.SYNC_LIST ->
+            ActionType.SYNC_LIST,
+            // Sending a file is this device's own choice to make, same as
+            // sending a message — the risk worth gating is the inbound
+            // side, which RECEIVE_FILE (below, via the default-deny
+            // fallback and the FILES_FROM_VERIFIED_ONLY policy) covers.
+            ActionType.SEND_FILE ->
                 GuardrailDecision.Allow(
                     "Allowed with peers you have already accepted a connection from."
                 )
