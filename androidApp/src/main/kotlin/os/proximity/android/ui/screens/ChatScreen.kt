@@ -40,6 +40,9 @@ import os.proximity.shared.domain.ChatMessage
 import os.proximity.shared.domain.Conversation
 import os.proximity.shared.domain.DeliveryState
 import os.proximity.shared.domain.MessageDirection
+import os.proximity.shared.files.FileDrop
+import os.proximity.shared.files.FileTransferDirection
+import os.proximity.shared.files.FileTransferStatus
 import os.proximity.shared.guardrail.TrustState
 
 @Composable
@@ -107,9 +110,12 @@ fun ConversationListScreen(
 @Composable
 fun ChatScreen(
     conversation: Conversation,
+    fileDrops: List<FileDrop>,
     onSend: (String) -> Unit,
     onVerify: () -> Unit,
     onScanToVerify: () -> Unit,
+    onPickFile: () -> Unit,
+    onSaveFile: (FileDrop) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var draft by remember { mutableStateOf("") }
@@ -129,6 +135,12 @@ fun ChatScreen(
                 onVerify = onVerify,
                 onScanToVerify = onScanToVerify
             )
+        }
+
+        if (fileDrops.isNotEmpty()) {
+            Column(Modifier.padding(horizontal = 12.dp, vertical = 4.dp)) {
+                fileDrops.forEach { drop -> FileDropRow(drop, onSaveFile) }
+            }
         }
 
         if (conversation.messages.isEmpty()) {
@@ -159,9 +171,60 @@ fun ChatScreen(
             onSend = {
                 onSend(draft)
                 draft = ""
-            }
+            },
+            onAttach = onPickFile
         )
     }
+}
+
+@Composable
+private fun FileDropRow(drop: FileDrop, onSave: (FileDrop) -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    drop.name,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Medium
+                )
+                Text(
+                    "${formatSize(drop.sizeBytes)} · ${statusLabel(drop)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (drop.direction == FileTransferDirection.RECEIVED && drop.status == FileTransferStatus.COMPLETE) {
+                OutlinedButton(onClick = { onSave(drop) }) { Text("Save") }
+            }
+        }
+    }
+}
+
+private fun statusLabel(drop: FileDrop): String = when (drop.status) {
+    FileTransferStatus.OFFERED -> "waiting for them to accept"
+    FileTransferStatus.PENDING -> "waiting for your decision"
+    FileTransferStatus.TRANSFERRING -> "sending…"
+    FileTransferStatus.COMPLETE ->
+        if (drop.direction == FileTransferDirection.RECEIVED) "received" else "sent"
+    FileTransferStatus.DECLINED -> "declined"
+    FileTransferStatus.EXPIRED -> "expired"
+    FileTransferStatus.FAILED -> "failed"
+}
+
+private fun formatSize(bytes: Long): String = when {
+    bytes >= 1_000_000 -> "%.1f MB".format(bytes / 1_000_000.0)
+    bytes >= 1_000 -> "%.0f KB".format(bytes / 1_000.0)
+    else -> "$bytes B"
 }
 
 @Composable
@@ -250,7 +313,12 @@ private fun MessageBubble(message: ChatMessage) {
 }
 
 @Composable
-private fun Composer(value: String, onValueChange: (String) -> Unit, onSend: () -> Unit) {
+private fun Composer(
+    value: String,
+    onValueChange: (String) -> Unit,
+    onSend: () -> Unit,
+    onAttach: () -> Unit
+) {
     Surface(color = MaterialTheme.colorScheme.surface) {
         Row(
             modifier = Modifier
@@ -258,6 +326,8 @@ private fun Composer(value: String, onValueChange: (String) -> Unit, onSend: () 
                 .padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
+            OutlinedButton(onClick = onAttach) { Text("Attach") }
+            Spacer(Modifier.padding(horizontal = 4.dp))
             OutlinedTextField(
                 value = value,
                 onValueChange = onValueChange,

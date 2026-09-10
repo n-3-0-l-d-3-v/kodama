@@ -29,6 +29,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -39,6 +40,9 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import os.proximity.android.files.ContentFiles
 import os.proximity.android.service.MeshForegroundService
 import os.proximity.android.ui.components.Banner
 import os.proximity.android.ui.components.MyQrCodeDialog
@@ -146,6 +150,51 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
         )
     }
 
+    val fileDrops by viewModel.fileDrops.collectAsState()
+    val ioScope = rememberCoroutineScope()
+
+    // Which peer a file picker result should be offered to. Read at result
+    // time for the same reason scanExpectedDeviceId is: the launcher's
+    // callback fires later, on its own, so it cannot close over a value
+    // that might have changed since launch.
+    var pendingSendPeerId by remember { mutableStateOf<String?>(null) }
+    val pickFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        val peerId = pendingSendPeerId
+        pendingSendPeerId = null
+        if (uri != null && peerId != null) {
+            ioScope.launch(Dispatchers.IO) {
+                val resolver = serviceContext.contentResolver
+                val bytes = ContentFiles.readBytes(resolver, uri)
+                if (bytes != null) {
+                    viewModel.sendFile(
+                        peerId,
+                        ContentFiles.displayNameOf(resolver, uri),
+                        ContentFiles.mimeTypeOf(resolver, uri),
+                        bytes
+                    )
+                }
+            }
+        }
+    }
+
+    var pendingSaveFileId by remember { mutableStateOf<String?>(null) }
+    val saveFileLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("*/*")
+    ) { uri ->
+        val fileId = pendingSaveFileId
+        pendingSaveFileId = null
+        if (uri != null && fileId != null) {
+            ioScope.launch(Dispatchers.IO) {
+                val bytes = viewModel.bytesForFile(fileId)
+                if (bytes != null) {
+                    ContentFiles.writeBytes(serviceContext.contentResolver, uri, bytes)
+                }
+            }
+        }
+    }
+
     // On Android 13+ the ongoing notification needs permission. That
     // notification *is* the disclosure that the radio is running, so it is
     // requested when the user opts in rather than treated as cosmetic.
@@ -224,9 +273,18 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
             when {
                 openConversation != null -> ChatScreen(
                     conversation = openConversation,
+                    fileDrops = fileDrops.filter { it.peerDeviceId == openConversation.peerDeviceId },
                     onSend = { viewModel.sendMessage(openConversation.peerDeviceId, it) },
                     onVerify = { viewModel.markVerified(openConversation.peerDeviceId) },
-                    onScanToVerify = { launchScan(openConversation.peerDeviceId) }
+                    onScanToVerify = { launchScan(openConversation.peerDeviceId) },
+                    onPickFile = {
+                        pendingSendPeerId = openConversation.peerDeviceId
+                        pickFileLauncher.launch("*/*")
+                    },
+                    onSaveFile = { drop ->
+                        pendingSaveFileId = drop.id
+                        saveFileLauncher.launch(drop.name)
+                    }
                 )
 
                 tab == Tab.NEARBY -> NearbyScreen(
