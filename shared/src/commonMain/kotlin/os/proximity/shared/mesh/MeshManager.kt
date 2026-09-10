@@ -41,6 +41,8 @@ import os.proximity.shared.session.Handshake
 import os.proximity.shared.session.HandshakeOutcome
 import os.proximity.shared.session.SessionRole
 import os.proximity.shared.util.currentTimeMillis
+import os.proximity.shared.util.hexToBytesOrNull
+import os.proximity.shared.util.toHex
 
 /**
  * Something the mesh needs a human to resolve or be told about.
@@ -86,7 +88,9 @@ class MeshManager(
     /** Optional: when absent, list traffic is simply not carried. */
     private val listSync: ListSyncDelegate? = null,
     /** Optional: when absent, no capabilities are offered or recorded. */
-    private val capabilities: CapabilityDelegate? = null
+    private val capabilities: CapabilityDelegate? = null,
+    /** Optional: when absent, file offers are neither sent nor accepted. */
+    private val fileTransfer: FileTransferDelegate? = null
 ) {
 
     private val mutex = Mutex()
@@ -403,6 +407,107 @@ class MeshManager(
         return delivered
     }
 
+    // ------------------------------------------------------------------- files
+
+    /**
+     * Announces a file to a peer. The bytes are not sent yet — only after
+     * the peer accepts, via [onSealedMessage]'s [Envelope.FileAccept]
+     * handling — so nothing is transmitted until both policy and the human
+     * on the other end have agreed to it.
+     */
+    suspend fun offerFile(peerDeviceId: String, fileId: String, name: String, mimeType: String, sizeBytes: Long): Boolean {
+        val context = mutex.withLock {
+            links.values.firstOrNull { it.session?.peerDeviceId == peerDeviceId }
+        }
+        val session = context?.session
+        if (context == null || session == null) {
+            eventsFlow.emit(MeshEvent.Blocked("Not connected to that device any more."))
+            return false
+        }
+
+        val decision = guardrail.evaluate(
+            GuardrailRequest(
+                direction = RequestDirection.OUTBOUND,
+                actionType = ActionType.SEND_FILE,
+                peer = PeerContext(peerDeviceId, trustStore.trustStateOf(peerDeviceId))
+            )
+        )
+        if (decision !is GuardrailDecision.Allow) {
+            eventsFlow.emit(MeshEvent.Blocked(decision.reason))
+            return false
+        }
+
+        return sendEnvelope(context, Envelope.FileOffer(fileId, name, mimeType, sizeBytes), FrameType.SEALED, session)
+    }
+
+    private suspend fun onFileOffer(context: LinkContext, session: SecureSession, envelope: Envelope.FileOffer) {
+        val delegate = fileTransfer ?: return
+        val decision = guardrail.evaluate(
+            GuardrailRequest(
+                direction = RequestDirection.INBOUND,
+                actionType = ActionType.RECEIVE_FILE,
+                peer = PeerContext(session.peerDeviceId, trustStore.trustStateOf(session.peerDeviceId)),
+                attributes = mapOf("name" to envelope.name, "sizeBytes" to envelope.sizeBytes.toString())
+            )
+        )
+
+        when (decision) {
+            is GuardrailDecision.Allow -> {
+                delegate.onFileOffered(session.peerDeviceId, envelope.fileId, envelope.name, envelope.mimeType, envelope.sizeBytes)
+                sendEnvelope(context, Envelope.FileAccept(envelope.fileId), FrameType.SEALED, session)
+            }
+
+            is GuardrailDecision.Deny -> {
+                eventsFlow.emit(MeshEvent.Blocked(decision.reason))
+                sendEnvelope(context, Envelope.FileDecline(envelope.fileId, decision.reason), FrameType.SEALED, session)
+            }
+
+            is GuardrailDecision.AskUser -> {
+                // Recorded as PENDING immediately so it is visible while the
+                // human decides, rather than appearing only after they answer.
+                delegate.onFileOffered(session.peerDeviceId, envelope.fileId, envelope.name, envelope.mimeType, envelope.sizeBytes)
+                askUser(
+                    address = context.address,
+                    actionType = ActionType.RECEIVE_FILE,
+                    reason = decision.reason,
+                    peerLabel = peerLabelFor(context.address),
+                    peerFingerprint = session.peerFingerprint,
+                    onAllow = {
+                        sendEnvelope(context, Envelope.FileAccept(envelope.fileId), FrameType.SEALED, session)
+                    },
+                    onDeny = {
+                        delegate.onOfferDeclined(envelope.fileId)
+                        sendEnvelope(context, Envelope.FileDecline(envelope.fileId, "Declined by recipient."), FrameType.SEALED, session)
+                    }
+                )
+            }
+        }
+    }
+
+    private suspend fun onFileAccept(context: LinkContext, session: SecureSession, envelope: Envelope.FileAccept) {
+        val delegate = fileTransfer ?: return
+        val bytes = delegate.onOfferAccepted(envelope.fileId) ?: return
+        val sent = sendEnvelope(context, Envelope.FileData(envelope.fileId, bytes.toHex()), FrameType.SEALED, session)
+        if (sent) delegate.onFileSent(envelope.fileId)
+    }
+
+    private suspend fun onFileDeclineEnvelope(envelope: Envelope.FileDecline) {
+        val delegate = fileTransfer ?: return
+        delegate.onOfferDeclined(envelope.fileId)
+        eventsFlow.emit(
+            MeshEvent.Notice("Your file was declined." + (envelope.reason?.let { " ($it)" } ?: ""))
+        )
+    }
+
+    private suspend fun onFileDataEnvelope(envelope: Envelope.FileData) {
+        val delegate = fileTransfer ?: return
+        // A peer that mangled or truncated the hex is treated as a failed
+        // transfer, not trusted input — never throw on attacker-controlled bytes.
+        val bytes = envelope.bytesHex.hexToBytesOrNull() ?: return
+        delegate.onFileDataReceived(envelope.fileId, bytes)
+        eventsFlow.emit(MeshEvent.Notice("Received a file."))
+    }
+
     private suspend fun sendCapabilities(context: LinkContext, session: SecureSession) {
         val delegate = capabilities ?: return
         // Null when the user has enabled nothing: staying silent is more
@@ -683,6 +788,11 @@ class MeshManager(
             is Envelope.ListOp, is Envelope.ListSync -> onListTraffic(session, envelope)
 
             is Envelope.CapabilityAdvert -> onCapabilityAdvert(session, envelope.advertisement)
+
+            is Envelope.FileOffer -> onFileOffer(context, session, envelope)
+            is Envelope.FileAccept -> onFileAccept(context, session, envelope)
+            is Envelope.FileDecline -> onFileDeclineEnvelope(envelope)
+            is Envelope.FileData -> onFileDataEnvelope(envelope)
             // Remaining envelope kinds arrive in later phases; ignoring them
             // is the default-deny position, not an oversight.
             else -> Unit
