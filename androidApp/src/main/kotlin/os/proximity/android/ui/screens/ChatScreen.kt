@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
@@ -108,6 +109,7 @@ fun ChatScreen(
     conversation: Conversation,
     onSend: (String) -> Unit,
     onVerify: () -> Unit,
+    onScanToVerify: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var draft by remember { mutableStateOf("") }
@@ -124,7 +126,8 @@ fun ChatScreen(
             UnverifiedNotice(
                 fingerprint = conversation.peerFingerprint,
                 peerLabel = conversation.peerLabel,
-                onVerify = onVerify
+                onVerify = onVerify,
+                onScanToVerify = onScanToVerify
             )
         }
 
@@ -162,7 +165,12 @@ fun ChatScreen(
 }
 
 @Composable
-private fun UnverifiedNotice(fingerprint: String?, peerLabel: String, onVerify: () -> Unit) {
+private fun UnverifiedNotice(
+    fingerprint: String?,
+    peerLabel: String,
+    onVerify: () -> Unit,
+    onScanToVerify: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -191,7 +199,10 @@ private fun UnverifiedNotice(fingerprint: String?, peerLabel: String, onVerify: 
                 )
             }
             Spacer(Modifier.height(10.dp))
-            Button(onClick = onVerify) { Text("It matches — verify") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onScanToVerify) { Text("Scan their code") }
+                OutlinedButton(onClick = onVerify) { Text("It matches — verify") }
+            }
         }
     }
 }

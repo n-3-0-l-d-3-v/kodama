@@ -37,8 +37,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import os.proximity.android.service.MeshForegroundService
 import os.proximity.android.ui.components.Banner
+import os.proximity.android.ui.components.MyQrCodeDialog
 import os.proximity.android.ui.screens.AuditScreen
 import os.proximity.android.ui.screens.ChatScreen
 import os.proximity.android.ui.screens.ConversationListScreen
@@ -121,6 +124,28 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
     // preference that authorised it.
     val serviceContext = LocalContext.current
 
+    var showMyQrDialog by remember { mutableStateOf(false) }
+
+    // Which device ID a scan is expected to match, if any. Read by the
+    // launcher's callback at result time, not at launch time, so it always
+    // reflects the scan that was actually in flight.
+    var scanExpectedDeviceId by remember { mutableStateOf<String?>(null) }
+    val scanLauncher = rememberLauncherForActivityResult(ScanContract()) { result ->
+        val contents = result.contents
+        if (contents != null) {
+            viewModel.reportScanOutcome(viewModel.handleScannedCode(contents, scanExpectedDeviceId))
+        }
+    }
+    fun launchScan(expectedDeviceId: String?) {
+        scanExpectedDeviceId = expectedDeviceId
+        scanLauncher.launch(
+            ScanOptions()
+                .setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+                .setPrompt("Point at their code")
+                .setBeepEnabled(false)
+        )
+    }
+
     // On Android 13+ the ongoing notification needs permission. That
     // notification *is* the disclosure that the radio is running, so it is
     // requested when the user opts in rather than treated as cosmetic.
@@ -200,7 +225,8 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
                 openConversation != null -> ChatScreen(
                     conversation = openConversation,
                     onSend = { viewModel.sendMessage(openConversation.peerDeviceId, it) },
-                    onVerify = { viewModel.markVerified(openConversation.peerDeviceId) }
+                    onVerify = { viewModel.markVerified(openConversation.peerDeviceId) },
+                    onScanToVerify = { launchScan(openConversation.peerDeviceId) }
                 )
 
                 tab == Tab.NEARBY -> NearbyScreen(
@@ -212,7 +238,9 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
                     onConnect = viewModel::connectTo,
                     onDisconnect = viewModel::disconnect,
                     onOpenChat = { openChatDeviceId = it },
-                    onVerify = viewModel::markVerified
+                    onVerify = viewModel::markVerified,
+                    onShowMyCode = { showMyQrDialog = true },
+                    onScanCode = { launchScan(null) }
                 )
 
                 openList != null -> ListDetailScreen(
@@ -249,6 +277,16 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
                     onDisplayNameChange = viewModel::setDisplayName
                 )
             }
+        }
+    }
+
+    if (showMyQrDialog) {
+        viewModel.myQrPayload?.let { payload ->
+            MyQrCodeDialog(
+                payload = payload,
+                fingerprint = viewModel.myFingerprint,
+                onDismiss = { showMyQrDialog = false }
+            )
         }
     }
 

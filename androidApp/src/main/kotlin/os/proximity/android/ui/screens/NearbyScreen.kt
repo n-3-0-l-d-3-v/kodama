@@ -43,6 +43,8 @@ fun NearbyScreen(
     onDisconnect: (Peer) -> Unit,
     onOpenChat: (String) -> Unit,
     onVerify: (String) -> Unit,
+    onShowMyCode: () -> Unit,
+    onScanCode: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier = modifier.fillMaxSize()) {
@@ -51,7 +53,9 @@ fun NearbyScreen(
                 displayName = myDisplayName,
                 fingerprint = myFingerprint,
                 isScanning = isScanning,
-                onToggleScan = onToggleScan
+                onToggleScan = onToggleScan,
+                onShowMyCode = onShowMyCode,
+                onScanCode = onScanCode
             )
         }
 
@@ -91,7 +95,9 @@ private fun IdentityCard(
     displayName: String,
     fingerprint: String?,
     isScanning: Boolean,
-    onToggleScan: () -> Unit
+    onToggleScan: () -> Unit,
+    onShowMyCode: () -> Unit,
+    onScanCode: () -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -121,10 +127,15 @@ private fun IdentityCard(
                 )
                 FingerprintText(fingerprint)
                 Text(
-                    "Read this aloud to someone to prove it's really you.",
+                    "Read this aloud, or let someone scan it, to prove it's really you.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onPrimaryContainer
                 )
+                Spacer(Modifier.height(10.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onShowMyCode) { Text("Show my code") }
+                    OutlinedButton(onClick = onScanCode) { Text("Scan a code") }
+                }
             }
 
             Spacer(Modifier.height(20.dp))
