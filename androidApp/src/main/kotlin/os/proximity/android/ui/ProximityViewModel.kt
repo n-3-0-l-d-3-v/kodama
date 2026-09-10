@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import os.proximity.android.data.AppSettings
 import os.proximity.shared.capability.Capability
 import os.proximity.shared.capability.CapabilityRegistry
+import os.proximity.shared.crypto.CryptoPrimitives
 import os.proximity.shared.domain.Conversation
 import os.proximity.shared.domain.ConversationStore
 import os.proximity.shared.domain.Peer
@@ -18,11 +19,24 @@ import os.proximity.shared.guardrail.AuditLog
 import os.proximity.shared.guardrail.AuditLogEntry
 import os.proximity.shared.guardrail.DefaultGuardrailEngine
 import os.proximity.shared.guardrail.PolicyCatalog
+import os.proximity.shared.identity.DeviceIdentifiers
 import os.proximity.shared.identity.DeviceIdentityProvider
+import os.proximity.shared.identity.QrVerificationCodec
 import os.proximity.shared.lists.SharedList
 import os.proximity.shared.lists.SharedListRepository
 import os.proximity.shared.mesh.MeshEvent
 import os.proximity.shared.mesh.MeshManager
+
+/** Result of scanning someone's verification QR code. */
+sealed class QrScanOutcome {
+    data class Verified(val deviceId: String) : QrScanOutcome()
+
+    /** The scanned code belongs to a different device than the one expected. */
+    data class Mismatch(val scannedDeviceId: String) : QrScanOutcome()
+
+    /** Not a Kodama code at all — a poster, a URL, someone else's app. */
+    object Invalid : QrScanOutcome()
+}
 
 /**
  * Holds screen state and owns the lifetime of mesh work.
@@ -39,6 +53,7 @@ class ProximityViewModel(
     private val listRepository: SharedListRepository,
     private val conversationStore: ConversationStore,
     private val capabilities: CapabilityRegistry,
+    private val cryptoPrimitives: CryptoPrimitives,
     val mesh: MeshManager
 ) : ViewModel() {
 
@@ -66,6 +81,10 @@ class ProximityViewModel(
     var myFingerprint by mutableStateOf<String?>(null)
         private set
 
+    /** This device's own QR payload — same identity as [myFingerprint], scannable. */
+    var myQrPayload by mutableStateOf<String?>(null)
+        private set
+
     init {
         mesh.start()
         applyEnabledPolicies()
@@ -78,8 +97,9 @@ class ProximityViewModel(
         }
 
         viewModelScope.launch {
-            myFingerprint = runCatching { identityProvider.getOrCreateIdentity().fingerprint }
-                .getOrNull()
+            val identity = runCatching { identityProvider.getOrCreateIdentity() }.getOrNull()
+            myFingerprint = identity?.fingerprint
+            myQrPayload = identity?.publicKeyBytes?.let { QrVerificationCodec.encode(it) }
         }
 
         viewModelScope.launch {
@@ -169,6 +189,39 @@ class ProximityViewModel(
         viewModelScope.launch { mesh.revokeVerification(deviceId) }
     }
 
+    /**
+     * Handles a decoded QR scan result.
+     *
+     * When [expectedDeviceId] is given (scanning from an open conversation),
+     * the scanned key must match it exactly before anything is trusted — a
+     * mismatch is reported, never silently verified against the wrong
+     * identity. When null (scanning a stranger's code before ever
+     * connecting), whoever the key belongs to is trusted directly: the
+     * in-person scan itself is the verification, per
+     * docs/THREAT_MODEL.md #9.
+     */
+    fun handleScannedCode(payload: String, expectedDeviceId: String? = null): QrScanOutcome {
+        val publicKey = QrVerificationCodec.decode(payload) ?: return QrScanOutcome.Invalid
+        val scannedDeviceId = DeviceIdentifiers.deviceIdFrom(cryptoPrimitives.sha256(publicKey))
+
+        if (expectedDeviceId != null && scannedDeviceId != expectedDeviceId) {
+            return QrScanOutcome.Mismatch(scannedDeviceId)
+        }
+
+        markVerified(scannedDeviceId)
+        return QrScanOutcome.Verified(scannedDeviceId)
+    }
+
+    fun reportScanOutcome(outcome: QrScanOutcome) {
+        banner = when (outcome) {
+            is QrScanOutcome.Verified -> "Verified via QR code."
+            is QrScanOutcome.Mismatch ->
+                "That code doesn't match this conversation — did not verify. " +
+                    "Make sure you're scanning the right person's screen."
+            QrScanOutcome.Invalid -> "That wasn't a Kodama verification code."
+        }
+    }
+
     // ----------------------------------------------------------- capabilities
 
     fun setCapabilityEnabled(name: String, enabled: Boolean) {
@@ -207,13 +260,14 @@ class ProximityViewModel(
         private val listRepository: SharedListRepository,
         private val conversationStore: ConversationStore,
         private val capabilities: CapabilityRegistry,
+        private val cryptoPrimitives: CryptoPrimitives,
         private val mesh: MeshManager
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             ProximityViewModel(
                 settings, engine, auditLog, identityProvider, listRepository,
-                conversationStore, capabilities, mesh
+                conversationStore, capabilities, cryptoPrimitives, mesh
             ) as T
     }
 }

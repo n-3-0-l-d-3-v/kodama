@@ -48,6 +48,11 @@ class AppContainer(context: Context) {
     val guardrailEngine = DefaultGuardrailEngine(auditLog)
     val identityProvider = KeystoreDeviceIdentityProvider()
 
+    // One shared instance: it is stateless except for its RNG, and QR
+    // verification needs the same SHA-256 the mesh uses so a scanned key
+    // hashes to exactly the device ID the handshake would produce.
+    val cryptoPrimitives = AndroidCryptoPrimitives()
+
     val capabilityRegistry = CapabilityRegistry(
         files = fileStore,
         now = { System.currentTimeMillis() }
@@ -61,7 +66,7 @@ class AppContainer(context: Context) {
 
     val meshManager = MeshManager(
         transport = BleMeshTransport(appContext),
-        primitives = AndroidCryptoPrimitives(),
+        primitives = cryptoPrimitives,
         identityProvider = identityProvider,
         verifier = JcaSignatureVerifier(),
         guardrail = guardrailEngine,
