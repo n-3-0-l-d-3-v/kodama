@@ -91,6 +91,35 @@ sealed class Envelope {
         val advertisement: CapabilityAdvertisement
     ) : Envelope()
 
+    /**
+     * Announces a file without sending its bytes yet. Metadata travels
+     * first so the receiver's Guardrail Engine can evaluate `RECEIVE_FILE`
+     * — and the user can be asked, if policy says so — before the sender
+     * commits to transmitting anything.
+     */
+    @Serializable
+    @SerialName("file_offer")
+    data class FileOffer(
+        val fileId: String,
+        val name: String,
+        val mimeType: String,
+        val sizeBytes: Long
+    ) : Envelope()
+
+    @Serializable
+    @SerialName("file_accept")
+    data class FileAccept(val fileId: String) : Envelope()
+
+    @Serializable
+    @SerialName("file_decline")
+    data class FileDecline(val fileId: String, val reason: String? = null) : Envelope()
+
+    /** The bytes, sent only after [FileAccept]. Hex-encoded — see
+     *  docs/adr/0004-file-transfer.md for why, and the size ceiling it implies. */
+    @Serializable
+    @SerialName("file_data")
+    data class FileData(val fileId: String, val bytesHex: String) : Envelope()
+
     companion object {
         const val PROTOCOL_VERSION = 1
     }
