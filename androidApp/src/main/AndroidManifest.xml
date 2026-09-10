@@ -20,6 +20,10 @@
          background service cannot run; everything else still works. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Only used when the user chooses to scan someone's verification code. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
     <uses-feature android:name="android.hardware.bluetooth_le" android:required="true" />
 
     <application
