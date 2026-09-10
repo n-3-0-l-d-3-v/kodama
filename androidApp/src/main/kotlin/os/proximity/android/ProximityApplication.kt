@@ -12,6 +12,8 @@ import os.proximity.shared.capability.CapabilityRegistry
 import os.proximity.shared.crypto.AndroidCryptoPrimitives
 import os.proximity.shared.domain.ConversationStore
 import os.proximity.shared.domain.FileConversationStore
+import os.proximity.shared.files.FileDropStore
+import os.proximity.shared.files.FileTransferManager
 import os.proximity.shared.guardrail.DefaultGuardrailEngine
 import os.proximity.shared.guardrail.FileAuditLog
 import os.proximity.shared.identity.FileTrustStore
@@ -64,6 +66,11 @@ class AppContainer(context: Context) {
         now = { System.currentTimeMillis() }
     )
 
+    val fileTransferManager = FileTransferManager(
+        store = FileDropStore(fileStore),
+        now = { System.currentTimeMillis() }
+    )
+
     val meshManager = MeshManager(
         transport = BleMeshTransport(appContext),
         primitives = cryptoPrimitives,
@@ -74,7 +81,8 @@ class AppContainer(context: Context) {
         scope = scope,
         displayName = { settings.displayName.value },
         listSync = listRepository,
-        capabilities = capabilityRegistry
+        capabilities = capabilityRegistry,
+        fileTransfer = fileTransferManager
     )
 
     /**
@@ -87,6 +95,7 @@ class AppContainer(context: Context) {
             auditLog.load()
             listRepository.load()
             capabilityRegistry.load()
+            fileTransferManager.load()
         }
     }
 }

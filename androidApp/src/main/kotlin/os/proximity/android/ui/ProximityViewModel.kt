@@ -15,6 +15,8 @@ import os.proximity.shared.crypto.CryptoPrimitives
 import os.proximity.shared.domain.Conversation
 import os.proximity.shared.domain.ConversationStore
 import os.proximity.shared.domain.Peer
+import os.proximity.shared.files.FileDrop
+import os.proximity.shared.files.FileTransferManager
 import os.proximity.shared.guardrail.AuditLog
 import os.proximity.shared.guardrail.AuditLogEntry
 import os.proximity.shared.guardrail.DefaultGuardrailEngine
@@ -54,6 +56,7 @@ class ProximityViewModel(
     private val conversationStore: ConversationStore,
     private val capabilities: CapabilityRegistry,
     private val cryptoPrimitives: CryptoPrimitives,
+    private val fileTransfer: FileTransferManager,
     val mesh: MeshManager
 ) : ViewModel() {
 
@@ -68,6 +71,7 @@ class ProximityViewModel(
     val enabledCapabilities: StateFlow<Set<String>> = capabilities.enabled
     val runInBackground: StateFlow<Boolean> = settings.runInBackground
     val peerCapabilities: StateFlow<Map<String, List<Capability>>> = capabilities.peerCapabilities
+    val fileDrops: StateFlow<List<FileDrop>> = fileTransfer.drops
 
     /** A Guardrail "ask me" decision currently blocking the mesh. */
     var pendingDecision by mutableStateOf<MeshEvent.DecisionRequired?>(null)
@@ -150,6 +154,30 @@ class ProximityViewModel(
         if (trimmed.isEmpty()) return
         viewModelScope.launch { mesh.sendChat(peerDeviceId, trimmed) }
     }
+
+    // ----------------------------------------------------------------- files
+
+    /**
+     * Prepares and offers a file. Returns false if it was too large to send
+     * (bytes never leave the device in that case) or if the offer itself
+     * was blocked by policy.
+     */
+    fun sendFile(peerDeviceId: String, name: String, mimeType: String, bytes: ByteArray) {
+        viewModelScope.launch {
+            val drop = fileTransfer.prepareOffer(peerDeviceId, name, mimeType, bytes)
+            if (drop == null) {
+                banner = "\"$name\" is too large to send."
+                return@launch
+            }
+            mesh.offerFile(peerDeviceId, drop.id, drop.name, drop.mimeType, drop.sizeBytes)
+        }
+    }
+
+    /** Bytes for a completed transfer, for the caller to write wherever the user chose. */
+    suspend fun bytesForFile(fileId: String): ByteArray? = fileTransfer.bytesFor(fileId)
+
+    fun fileDropsFor(peerDeviceId: String): List<FileDrop> =
+        fileDrops.value.filter { it.peerDeviceId == peerDeviceId }
 
     // ---------------------------------------------------------------- lists
 
@@ -261,13 +289,14 @@ class ProximityViewModel(
         private val conversationStore: ConversationStore,
         private val capabilities: CapabilityRegistry,
         private val cryptoPrimitives: CryptoPrimitives,
+        private val fileTransfer: FileTransferManager,
         private val mesh: MeshManager
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             ProximityViewModel(
                 settings, engine, auditLog, identityProvider, listRepository,
-                conversationStore, capabilities, cryptoPrimitives, mesh
+                conversationStore, capabilities, cryptoPrimitives, fileTransfer, mesh
             ) as T
     }
 }
