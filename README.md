@@ -67,6 +67,11 @@ what this app just did, and why?*
   pre-authorise a stranger before ever connecting. The codec is fully
   tested; the on-device scan flow (camera, third-party scanner activity) is
   not.
+- File transfer with automatic expiry, up to 200 KB per file (see
+  docs/adr/0004-file-transfer.md). Offer/accept/decline/data all tested
+  end to end over the real mesh stack, including the ask-the-user flow;
+  the Android file-picker/save-file UI (Storage Access Framework) is not
+  yet exercised on a device.
 - Conversation history that survives restarts, with bounded retention.
 - An opt-in foreground service so the mesh can keep running when the app is
   not in front.
@@ -78,7 +83,6 @@ what this app just did, and why?*
 
 - Multi-hop relay and store-and-forward (messages only travel one hop).
 - Encryption at rest for stored data (see docs/adr/0002-storage.md).
-- File transfer.
 - Wi-Fi Direct/Aware transport.
 - iOS.
 
@@ -126,6 +130,7 @@ kodama/
 │       ├── capability/ # what a device offers, and for how long
 │       ├── crypto/     # primitives interface, HKDF, SecureSession
 │       ├── domain/     # Peer, ChatMessage, Conversation
+│       ├── files/      # file transfer state machine and persistence
 │       ├── guardrail/  # engine, rules, policy catalog, audit log
 │       ├── identity/   # device identity, trust store
 │       ├── lists/      # shared list CRDT and repository
@@ -136,6 +141,7 @@ kodama/
 │   └── src/main/kotlin/os/proximity/android/
 │       ├── mesh/       # BLE transport
 │       ├── verification/ # QR code generation
+│       ├── files/      # ContentResolver read/write helpers
 │       └── ui/         # screens, components, theme
 └── docs/            # architecture, threat model, policy design, ADRs
 ```
@@ -170,6 +176,7 @@ powershell -ExecutionPolicy Bypass -File tools/verify-shared.ps1
 - [ADR 0001 — Cryptography](docs/adr/0001-cryptography.md)
 - [ADR 0002 — Local storage](docs/adr/0002-storage.md)
 - [ADR 0003 — Shared lists](docs/adr/0003-shared-lists.md)
+- [ADR 0004 — File transfer](docs/adr/0004-file-transfer.md)
 - [Changelog](docs/CHANGELOG.md)
 
 ## License

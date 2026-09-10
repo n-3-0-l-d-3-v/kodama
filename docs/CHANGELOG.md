@@ -190,3 +190,28 @@ listed here — this tracks meaningful progress, not every file touched.
   shared codec.
 - Not yet exercised on a device: camera permission, the third-party scanner
   activity, and the end-to-end scan UI.
+
+## File transfer
+
+- Activates the `SEND_FILE`/`RECEIVE_FILE` action types and the
+  "only accept files from people I've verified" policy that have existed
+  since Phase 1 but were never wired to anything real.
+- Offer → accept/decline → data handshake, reusing the existing encrypted,
+  chunked message pipeline rather than building a second one. Rationale
+  (including the resulting 200 KB size ceiling) in
+  `docs/adr/0004-file-transfer.md`.
+- Metadata travels before bytes, so the Guardrail Engine — and the human,
+  if policy says to ask — decides before the sender transmits anything.
+- Automatic expiry via `FileDrop.isExpired()`, with an explicit carve-out:
+  a transfer mid-flight is never treated as expired, however old its
+  timestamp gets.
+- A declined offer never touches disk. An outbound file's bytes stay in
+  memory only until sent, then are discarded — only the receiver keeps a
+  persisted copy.
+- 12 new `FileTransferManager` unit tests plus an end-to-end integration
+  test exercising the full flow (multi-chunk transfer, ask-user, decline,
+  default-deny, unconditional-allow for sending) over two independent
+  `MeshManager`s on a loopback transport.
+- Android: pick a file to send and save a received one via the standard
+  Storage Access Framework contracts (`GetContent`, `CreateDocument`) —
+  no new dependency, but not yet exercised on a device.
