@@ -120,6 +120,19 @@ sealed class Envelope {
     @SerialName("file_data")
     data class FileData(val fileId: String, val bytesHex: String) : Envelope()
 
+    /**
+     * A short, self-expiring status ("at the north gate," "all clear").
+     * Carries its own expiry rather than relying on the recipient's clock
+     * for a TTL, so both sides agree on when it goes stale.
+     */
+    @Serializable
+    @SerialName("status")
+    data class StatusPost(
+        val text: String,
+        val postedAtEpochMillis: Long,
+        val expiresAtEpochMillis: Long
+    ) : Envelope()
+
     companion object {
         const val PROTOCOL_VERSION = 1
     }
