@@ -56,21 +56,20 @@ trusting an unreadable list — would be a security failure.
 
 ## What this does not yet do
 
-- **The stored data is not encrypted at rest.** It relies on Android's
-  app-private storage and full-disk encryption. That protects against
-  other apps, but not against an attacker with the unlocked device. The
-  original stack called for an encrypted database, and this is a real gap,
-  recorded rather than glossed over.
 - **Conversation history is not persisted yet** — only the audit log and
   trust store are. Messages are still lost on restart.
+
+Encryption at rest — originally listed here as a gap — is resolved: see
+`docs/adr/0005-encryption-at-rest.md`. It layers onto `FileStore`
+transparently rather than requiring a database, which is what let it be
+added without touching `FileAuditLog`, `FileTrustStore`, or anything else
+built on this interface.
 
 ## When to revisit
 
 Reintroduce SQLDelight (or SQLCipher) if any of these become true:
 
 - Conversation history grows enough to need indexed queries or paging.
-- Encryption at rest is implemented — an encrypted database is a better
-  answer than hand-rolled file encryption.
 - Multi-table relational queries appear (e.g. capability grants joined
   against peers).
 

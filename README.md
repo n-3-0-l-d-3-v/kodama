@@ -72,6 +72,12 @@ what this app just did, and why?*
   end to end over the real mesh stack, including the ask-the-user flow;
   the Android file-picker/save-file UI (Storage Access Framework) is not
   yet exercised on a device.
+- Encryption at rest: every persisted file (audit log, trust decisions,
+  lists, capabilities, file drops) is sealed with AES-256-GCM before it
+  touches disk, via a non-extractable Android Keystore key. See
+  docs/adr/0005-encryption-at-rest.md. The record-format logic is fully
+  tested; the real Keystore-backed cipher, like the Keystore identity key,
+  cannot be unit-tested outside a device.
 - Conversation history that survives restarts, with bounded retention.
 - An opt-in foreground service so the mesh can keep running when the app is
   not in front.
@@ -82,7 +88,6 @@ what this app just did, and why?*
 **Not built yet**
 
 - Multi-hop relay and store-and-forward (messages only travel one hop).
-- Encryption at rest for stored data (see docs/adr/0002-storage.md).
 - Wi-Fi Direct/Aware transport.
 - iOS.
 
@@ -136,7 +141,8 @@ kodama/
 │       ├── lists/      # shared list CRDT and repository
 │       ├── mesh/       # MeshTransport interface, MeshManager
 │       ├── protocol/   # framing, chunking, envelopes
-│       └── session/    # handshake, transcripts
+│       ├── session/    # handshake, transcripts
+│       └── storage/    # FileStore, at-rest encryption
 ├── androidApp/      # Android app
 │   └── src/main/kotlin/os/proximity/android/
 │       ├── mesh/       # BLE transport
@@ -177,6 +183,7 @@ powershell -ExecutionPolicy Bypass -File tools/verify-shared.ps1
 - [ADR 0002 — Local storage](docs/adr/0002-storage.md)
 - [ADR 0003 — Shared lists](docs/adr/0003-shared-lists.md)
 - [ADR 0004 — File transfer](docs/adr/0004-file-transfer.md)
+- [ADR 0005 — Encryption at rest](docs/adr/0005-encryption-at-rest.md)
 - [Changelog](docs/CHANGELOG.md)
 
 ## License

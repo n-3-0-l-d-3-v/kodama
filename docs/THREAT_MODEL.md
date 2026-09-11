@@ -134,6 +134,11 @@ One participant's phone is compromised and used against the mesh.
   retroactively readable from a later compromise.
 - A compromised peer can act only within the capabilities others granted
   it; each device enforces policy locally.
+- The audit log, trust decisions, shared lists, capabilities, and file
+  drops are encrypted at rest (docs/adr/0005-encryption-at-rest.md) with a
+  non-extractable Keystore key — an attacker with filesystem access to the
+  device (an adb backup, a forensic image) sees ciphertext, not the mesh's
+  history.
 
 **Gap:** no revocation. If a device is known compromised, peers have no way
 to distribute that fact.

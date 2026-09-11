@@ -215,3 +215,33 @@ listed here — this tracks meaningful progress, not every file touched.
 - Android: pick a file to send and save a received one via the standard
   Storage Access Framework contracts (`GetContent`, `CreateDocument`) —
   no new dependency, but not yet exercised on a device.
+
+## Encryption at rest
+
+- Closes the gap named in ADR 0002: every persisted file — audit log,
+  trust decisions, shared lists, capabilities, file drops — is now sealed
+  with AES-256-GCM before it touches disk.
+- `EncryptedFileStore` wraps the existing `FileStore` interface
+  transparently: `FileAuditLog`, `FileTrustStore`, `SharedListRepository`,
+  `CapabilityRegistry`, and `FileDropStore` needed zero code changes.
+  Turned on for the whole app in one line at the composition root.
+- Per-record sealing so `writeText` and `appendLine` compose correctly —
+  `FileAuditLog`'s compact-then-continue pattern mixes both on the same
+  file. A hand-traced bug was caught and fixed before it shipped: the
+  first version of `writeText` didn't terminate its record with a newline,
+  so a following `appendLine` would have concatenated onto it with no
+  separator.
+- `AtRestCipher` is opaque (seal/open, no raw key bytes) for the same
+  reason `EcdhKeyPair` hides its private key behind a handle — the real
+  implementation (`AndroidKeystoreAtRestCipher`) is a non-extractable
+  AES-256-GCM key generated inside the Android Keystore and never
+  exported, mirroring the identity-key decision in ADR 0001.
+- File name is bound as AEAD associated data, so a ciphertext sealed for
+  one file cannot be passed off as another's.
+- 14 new tests covering round trips, the compact-then-continue pattern,
+  tamper tolerance (a corrupt record is skipped, not fatal), wrong-key
+  rejection, AAD binding, and two integration tests proving
+  `FileTrustStore` and `FileAuditLog` work unchanged when wrapped. The
+  real Keystore cipher itself, like the Keystore identity key, cannot be
+  unit-tested outside a device — full rationale in
+  `docs/adr/0005-encryption-at-rest.md`.
