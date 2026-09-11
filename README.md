@@ -79,6 +79,11 @@ what this app just did, and why?*
   tested; the real Keystore-backed cipher, like the Keystore identity key,
   cannot be unit-tested outside a device.
 - Conversation history that survives restarts, with bounded retention.
+- Group status / coordination board: short, self-expiring status updates
+  ("at the north gate") broadcast to connected peers, with a
+  verified-only policy option. Deliberately not persisted — a stale
+  status is misleading, not just wasted space. Tested both as a state
+  machine in isolation and end to end over the real mesh stack.
 - An opt-in foreground service so the mesh can keep running when the app is
   not in front.
 - Bluetooth LE transport: symmetric scan/advertise, GATT client and server,
@@ -142,6 +147,7 @@ kodama/
 │       ├── mesh/       # MeshTransport interface, MeshManager
 │       ├── protocol/   # framing, chunking, envelopes
 │       ├── session/    # handshake, transcripts
+│       ├── status/     # status board: domain model, StatusBoardManager
 │       └── storage/    # FileStore, at-rest encryption
 ├── androidApp/      # Android app
 │   └── src/main/kotlin/os/proximity/android/

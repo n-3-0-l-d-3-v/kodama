@@ -245,3 +245,26 @@ listed here — this tracks meaningful progress, not every file touched.
   real Keystore cipher itself, like the Keystore identity key, cannot be
   unit-tested outside a device — full rationale in
   `docs/adr/0005-encryption-at-rest.md`.
+
+## Status board
+
+- Group status / coordination board: a short, self-expiring status
+  ("at the north gate") broadcast to connected peers over the existing
+  encrypted mesh pipeline. New `Envelope.StatusPost`, `ActionType.SHARE_STATUS`
+  (default-allow, same posture as messaging), and an off-by-default
+  "only share status with people I've verified" policy mirroring the
+  equivalent list-sync option.
+- `StatusBoardManager` holds the board in memory only — deliberately not
+  persisted, since a stale status is misleading rather than merely wasted
+  space, unlike lists, capabilities, or file drops.
+- Each status carries its own expiry rather than trusting the recipient's
+  clock, so both sides agree on when it goes stale; `currentStatus()` filters
+  point-in-time, and a periodic `purgeExpired()` keeps the reactive board
+  state fresh without waiting for a read.
+- 10 new `StatusBoardManager` unit tests (expiry boundary, truncation,
+  per-peer independence, purge) plus an end-to-end integration test proving
+  a status survives the real handshake/encryption/guardrail pipeline,
+  including the verified-only policy path.
+- Android: a status composer on the Nearby screen's identity card, and each
+  connected peer's current status shown inline on their row; wired through
+  the ViewModel with a 60-second purge ticker.
