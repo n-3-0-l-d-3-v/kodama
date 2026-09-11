@@ -33,6 +33,7 @@ import os.proximity.shared.identity.TrustStore
 import os.proximity.shared.protocol.AssembledMessage
 import os.proximity.shared.protocol.Envelope
 import os.proximity.shared.protocol.EnvelopeCodec
+import os.proximity.shared.status.StatusLimits
 import os.proximity.shared.protocol.Frame
 import os.proximity.shared.protocol.FrameChunker
 import os.proximity.shared.protocol.FrameType
@@ -90,7 +91,9 @@ class MeshManager(
     /** Optional: when absent, no capabilities are offered or recorded. */
     private val capabilities: CapabilityDelegate? = null,
     /** Optional: when absent, file offers are neither sent nor accepted. */
-    private val fileTransfer: FileTransferDelegate? = null
+    private val fileTransfer: FileTransferDelegate? = null,
+    /** Optional: when absent, status updates are neither sent nor received. */
+    private val statusBoard: StatusBoardDelegate? = null
 ) {
 
     private val mutex = Mutex()
@@ -508,6 +511,58 @@ class MeshManager(
         eventsFlow.emit(MeshEvent.Notice("Received a file."))
     }
 
+    // ------------------------------------------------------------------ status
+
+    /**
+     * Posts a status to every peer we currently hold a secure session with.
+     * Best effort, same as [broadcastListOperation]: a peer out of range
+     * simply never sees it, and there is nothing to retry or reconcile —
+     * a status board has no history for a late arrival to catch up on.
+     */
+    suspend fun broadcastStatus(text: String, ttlMillis: Long = StatusLimits.DEFAULT_TTL_MILLIS): Int {
+        val targets = mutex.withLock { links.values.filter { it.session != null } }
+        val postedAt = currentTimeMillis()
+        var delivered = 0
+
+        for (context in targets) {
+            val session = context.session ?: continue
+            val decision = guardrail.evaluate(
+                GuardrailRequest(
+                    direction = RequestDirection.OUTBOUND,
+                    actionType = ActionType.SHARE_STATUS,
+                    peer = PeerContext(session.peerDeviceId, trustStore.trustStateOf(session.peerDeviceId))
+                )
+            )
+            if (decision !is GuardrailDecision.Allow) continue
+
+            val envelope = Envelope.StatusPost(text, postedAt, postedAt + ttlMillis)
+            if (sendEnvelope(context, envelope, FrameType.SEALED, session)) delivered++
+        }
+        return delivered
+    }
+
+    private suspend fun onStatusPost(session: SecureSession, envelope: Envelope.StatusPost) {
+        val delegate = statusBoard ?: return
+        val decision = guardrail.evaluate(
+            GuardrailRequest(
+                direction = RequestDirection.INBOUND,
+                actionType = ActionType.SHARE_STATUS,
+                peer = PeerContext(session.peerDeviceId, trustStore.trustStateOf(session.peerDeviceId))
+            )
+        )
+        if (decision !is GuardrailDecision.Allow) {
+            eventsFlow.emit(MeshEvent.Blocked(decision.reason))
+            return
+        }
+
+        delegate.onStatusReceived(
+            session.peerDeviceId,
+            envelope.text,
+            envelope.postedAtEpochMillis,
+            envelope.expiresAtEpochMillis
+        )
+    }
+
     private suspend fun sendCapabilities(context: LinkContext, session: SecureSession) {
         val delegate = capabilities ?: return
         // Null when the user has enabled nothing: staying silent is more
@@ -793,6 +848,8 @@ class MeshManager(
             is Envelope.FileAccept -> onFileAccept(context, session, envelope)
             is Envelope.FileDecline -> onFileDeclineEnvelope(envelope)
             is Envelope.FileData -> onFileDataEnvelope(envelope)
+
+            is Envelope.StatusPost -> onStatusPost(session, envelope)
             // Remaining envelope kinds arrive in later phases; ignoring them
             // is the default-deny position, not an oversight.
             else -> Unit
