@@ -22,6 +22,9 @@ import os.proximity.shared.identity.KeystoreDeviceIdentityProvider
 import os.proximity.shared.lists.SharedListRepository
 import os.proximity.shared.mesh.MeshManager
 import os.proximity.shared.storage.AndroidFileStore
+import os.proximity.shared.storage.AndroidKeystoreAtRestCipher
+import os.proximity.shared.storage.EncryptedFileStore
+import os.proximity.shared.storage.FileStore
 
 /**
  * The object graph, written out in one readable place rather than assembled
@@ -42,7 +45,15 @@ class AppContainer(context: Context) {
 
     val settings = AppSettings(appContext)
 
-    private val fileStore = AndroidFileStore(appContext)
+    // Every persisted file — audit log, trust decisions, lists,
+    // capabilities, file drops — passes through this before it ever
+    // touches disk. AppSettings (display name, onboarding flag, which
+    // policies are on) stays on plain SharedPreferences: none of it is
+    // sensitive in the way the mesh's own record of who-did-what is.
+    private val fileStore: FileStore = EncryptedFileStore(
+        AndroidFileStore(appContext),
+        AndroidKeystoreAtRestCipher()
+    )
 
     val auditLog = FileAuditLog(fileStore)
     val trustStore = FileTrustStore(fileStore)
