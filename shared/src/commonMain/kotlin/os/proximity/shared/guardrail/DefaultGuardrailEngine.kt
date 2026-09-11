@@ -87,7 +87,11 @@ class DefaultGuardrailEngine(
             // sending a message — the risk worth gating is the inbound
             // side, which RECEIVE_FILE (below, via the default-deny
             // fallback and the FILES_FROM_VERIFIED_ONLY policy) covers.
-            ActionType.SEND_FILE ->
+            ActionType.SEND_FILE,
+            // A status ("at the north gate") is low-risk information, both
+            // to post and to receive — same posture as messaging, with a
+            // stricter user policy available rather than forced here.
+            ActionType.SHARE_STATUS ->
                 GuardrailDecision.Allow(
                     "Allowed with peers you have already accepted a connection from."
                 )

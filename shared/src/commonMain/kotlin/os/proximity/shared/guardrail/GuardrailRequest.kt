@@ -34,6 +34,7 @@ enum class ActionType {
     REQUEST_CAPABILITY,
     RELAY_MESSAGE,
     SYNC_LIST,
+    SHARE_STATUS,
     LEAVE_MESH,
     EXECUTE_CODE
 }
