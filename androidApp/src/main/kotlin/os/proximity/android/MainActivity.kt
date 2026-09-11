@@ -37,6 +37,7 @@ class MainActivity : ComponentActivity() {
                 capabilities = container.capabilityRegistry,
                 cryptoPrimitives = container.cryptoPrimitives,
                 fileTransfer = container.fileTransferManager,
+                statusBoard = container.statusBoardManager,
                 mesh = container.meshManager
             )
         )[ProximityViewModel::class.java]

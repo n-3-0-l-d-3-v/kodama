@@ -15,11 +15,17 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import os.proximity.android.ui.components.EmptyState
@@ -31,6 +37,7 @@ import os.proximity.android.ui.theme.LocalDecisionColors
 import os.proximity.shared.domain.LinkState
 import os.proximity.shared.domain.Peer
 import os.proximity.shared.guardrail.TrustState
+import os.proximity.shared.status.StatusLimits
 
 @Composable
 fun NearbyScreen(
@@ -45,6 +52,8 @@ fun NearbyScreen(
     onVerify: (String) -> Unit,
     onShowMyCode: () -> Unit,
     onScanCode: () -> Unit,
+    onPostStatus: (String) -> Unit = {},
+    statusOf: (String) -> String? = { null },
     modifier: Modifier = Modifier
 ) {
     LazyColumn(modifier = modifier.fillMaxSize()) {
@@ -55,7 +64,8 @@ fun NearbyScreen(
                 isScanning = isScanning,
                 onToggleScan = onToggleScan,
                 onShowMyCode = onShowMyCode,
-                onScanCode = onScanCode
+                onScanCode = onScanCode,
+                onPostStatus = onPostStatus
             )
         }
 
@@ -78,6 +88,7 @@ fun NearbyScreen(
             items(peers, key = { it.transportAddress }) { peer ->
                 PeerRow(
                     peer = peer,
+                    status = peer.deviceId?.let(statusOf),
                     onConnect = { onConnect(peer) },
                     onDisconnect = { onDisconnect(peer) },
                     onOpenChat = { peer.deviceId?.let(onOpenChat) },
@@ -97,7 +108,8 @@ private fun IdentityCard(
     isScanning: Boolean,
     onToggleScan: () -> Unit,
     onShowMyCode: () -> Unit,
-    onScanCode: () -> Unit
+    onScanCode: () -> Unit,
+    onPostStatus: (String) -> Unit
 ) {
     Surface(
         modifier = Modifier
@@ -152,13 +164,52 @@ private fun IdentityCard(
                     )
                 }
             }
+
+            Spacer(Modifier.height(16.dp))
+            StatusComposer(onPostStatus)
         }
+    }
+}
+
+@Composable
+private fun StatusComposer(onPostStatus: (String) -> Unit) {
+    var text by remember { mutableStateOf("") }
+    Column {
+        Text(
+            "Broadcast a status",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
+        Spacer(Modifier.height(6.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { if (it.length <= StatusLimits.MAX_TEXT_LENGTH) text = it },
+                placeholder = { Text("\"At the north gate\"") },
+                singleLine = true,
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.padding(horizontal = 4.dp))
+            Button(
+                enabled = text.isNotBlank(),
+                onClick = {
+                    onPostStatus(text)
+                    text = ""
+                }
+            ) { Text("Post") }
+        }
+        Text(
+            "Visible to connected peers for ${StatusLimits.DEFAULT_TTL_MILLIS / 60_000} minutes.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onPrimaryContainer
+        )
     }
 }
 
 @Composable
 private fun PeerRow(
     peer: Peer,
+    status: String?,
     onConnect: () -> Unit,
     onDisconnect: () -> Unit,
     onOpenChat: () -> Unit,
@@ -213,6 +264,15 @@ private fun PeerRow(
                     "Their code: ${peer.fingerprint}",
                     style = MaterialTheme.typography.bodySmall,
                     fontWeight = FontWeight.Medium
+                )
+            }
+
+            if (peer.isSecured && status != null) {
+                Spacer(Modifier.height(10.dp))
+                Text(
+                    "\"$status\"",
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontStyle = FontStyle.Italic
                 )
             }
 

@@ -122,6 +122,7 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
     val lists by viewModel.lists.collectAsState()
     val enabledCapabilities by viewModel.enabledCapabilities.collectAsState()
     val runInBackground by viewModel.runInBackground.collectAsState()
+    val statusBoardEntries by viewModel.statusBoardEntries.collectAsState()
 
     // The setting is the single source of truth; the service follows it.
     // Doing it the other way round would let the service outlive the
@@ -298,7 +299,12 @@ private fun MainScaffold(viewModel: ProximityViewModel, displayName: String) {
                     onOpenChat = { openChatDeviceId = it },
                     onVerify = viewModel::markVerified,
                     onShowMyCode = { showMyQrDialog = true },
-                    onScanCode = { launchScan(null) }
+                    onScanCode = { launchScan(null) },
+                    onPostStatus = viewModel::postStatus,
+                    // Reading statusBoardEntries (already collected as state above)
+                    // is what makes this recompose as statuses arrive or expire;
+                    // viewModel.statusOf applies the same expiry check the board itself uses.
+                    statusOf = { deviceId -> statusBoardEntries[deviceId]?.let { viewModel.statusOf(deviceId)?.text } }
                 )
 
                 openList != null -> ListDetailScreen(

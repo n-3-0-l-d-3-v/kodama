@@ -21,6 +21,7 @@ import os.proximity.shared.identity.JcaSignatureVerifier
 import os.proximity.shared.identity.KeystoreDeviceIdentityProvider
 import os.proximity.shared.lists.SharedListRepository
 import os.proximity.shared.mesh.MeshManager
+import os.proximity.shared.status.StatusBoardManager
 import os.proximity.shared.storage.AndroidFileStore
 import os.proximity.shared.storage.AndroidKeystoreAtRestCipher
 import os.proximity.shared.storage.EncryptedFileStore
@@ -82,6 +83,10 @@ class AppContainer(context: Context) {
         now = { System.currentTimeMillis() }
     )
 
+    // Not persisted, unlike the others above — a stale status is misleading
+    // rather than merely wasted space, so it lives only as long as the process.
+    val statusBoardManager = StatusBoardManager(now = { System.currentTimeMillis() })
+
     val meshManager = MeshManager(
         transport = BleMeshTransport(appContext),
         primitives = cryptoPrimitives,
@@ -93,7 +98,8 @@ class AppContainer(context: Context) {
         displayName = { settings.displayName.value },
         listSync = listRepository,
         capabilities = capabilityRegistry,
-        fileTransfer = fileTransferManager
+        fileTransfer = fileTransferManager,
+        statusBoard = statusBoardManager
     )
 
     /**

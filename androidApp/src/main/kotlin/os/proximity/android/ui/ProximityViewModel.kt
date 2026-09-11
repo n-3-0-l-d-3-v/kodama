@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import os.proximity.android.data.AppSettings
@@ -28,6 +29,8 @@ import os.proximity.shared.lists.SharedList
 import os.proximity.shared.lists.SharedListRepository
 import os.proximity.shared.mesh.MeshEvent
 import os.proximity.shared.mesh.MeshManager
+import os.proximity.shared.status.StatusBoardManager
+import os.proximity.shared.status.StatusUpdate
 
 /** Result of scanning someone's verification QR code. */
 sealed class QrScanOutcome {
@@ -57,6 +60,7 @@ class ProximityViewModel(
     private val capabilities: CapabilityRegistry,
     private val cryptoPrimitives: CryptoPrimitives,
     private val fileTransfer: FileTransferManager,
+    private val statusBoard: StatusBoardManager,
     val mesh: MeshManager
 ) : ViewModel() {
 
@@ -72,6 +76,7 @@ class ProximityViewModel(
     val runInBackground: StateFlow<Boolean> = settings.runInBackground
     val peerCapabilities: StateFlow<Map<String, List<Capability>>> = capabilities.peerCapabilities
     val fileDrops: StateFlow<List<FileDrop>> = fileTransfer.drops
+    val statusBoardEntries: StateFlow<Map<String, StatusUpdate>> = statusBoard.board
 
     /** A Guardrail "ask me" decision currently blocking the mesh. */
     var pendingDecision by mutableStateOf<MeshEvent.DecisionRequired?>(null)
@@ -118,6 +123,16 @@ class ProximityViewModel(
 
         viewModelScope.launch {
             settings.enabledPolicyIds.collect { applyEnabledPolicies(it) }
+        }
+
+        // The board only filters expiry on read (currentStatus), so this
+        // ticker exists purely to make staleness show up in the UI without
+        // the user having to interact with anything first.
+        viewModelScope.launch {
+            while (true) {
+                delay(60_000)
+                statusBoard.purgeExpired()
+            }
         }
     }
 
@@ -250,6 +265,16 @@ class ProximityViewModel(
         }
     }
 
+    // --------------------------------------------------------------- status
+
+    fun postStatus(text: String) {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch { mesh.broadcastStatus(trimmed) }
+    }
+
+    fun statusOf(peerDeviceId: String): StatusUpdate? = statusBoard.currentStatus(peerDeviceId)
+
     // ----------------------------------------------------------- capabilities
 
     fun setCapabilityEnabled(name: String, enabled: Boolean) {
@@ -290,13 +315,14 @@ class ProximityViewModel(
         private val capabilities: CapabilityRegistry,
         private val cryptoPrimitives: CryptoPrimitives,
         private val fileTransfer: FileTransferManager,
+        private val statusBoard: StatusBoardManager,
         private val mesh: MeshManager
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T =
             ProximityViewModel(
                 settings, engine, auditLog, identityProvider, listRepository,
-                conversationStore, capabilities, cryptoPrimitives, fileTransfer, mesh
+                conversationStore, capabilities, cryptoPrimitives, fileTransfer, statusBoard, mesh
             ) as T
     }
 }
