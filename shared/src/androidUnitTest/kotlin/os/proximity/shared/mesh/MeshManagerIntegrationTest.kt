@@ -359,6 +359,37 @@ class MeshManagerIntegrationTest {
     }
 
     @Test
+    fun aFloodOfNeverBeforeSeenAddressesIsCappedWithoutTouchingAlreadyTrackedOnes() = runTest(UnconfinedTestDispatcher()) {
+        val alice = node("Alice", "AA:AA:AA:AA:AA:AA", backgroundScope)
+        alice.manager.start()
+
+        val aliceEvents = mutableListOf<MeshEvent>()
+        backgroundScope.launchCollect(alice.manager.events) { aliceEvents.add(it) }
+
+        // MeshManager.MAX_CONCURRENT_LINKS is 40 and private; this count must
+        // track it, since this test proves the cap it enforces.
+        val attackers = (1..41).map { i ->
+            node("Attacker$i", "attacker-$i", backgroundScope).also {
+                it.transport.peer = alice.transport
+                it.engine.addRule(allowConnectRule())
+            }
+        }
+
+        // One connection attempt per distinct, never-before-seen address —
+        // nothing here is a real handshake Alice would ever complete, but
+        // each one is a well-formed frame that reaches onIncoming, which is
+        // exactly what's being flooded.
+        attackers.forEach { it.manager.connectTo("AA:AA:AA:AA:AA:AA") }
+        advanceUntilIdle()
+
+        // The 41st address should never even have reached the Guardrail
+        // Engine — its frame was dropped for being one too many distinct
+        // addresses, before policy ever got a say.
+        val decisionsRequested = aliceEvents.filterIsInstance<MeshEvent.DecisionRequired>().size
+        assertEquals(40, decisionsRequested, "the 41st address should have been refused before reaching policy")
+    }
+
+    @Test
     fun aSecuredPeerSurvivesAMissedScanCycle() = runTest(UnconfinedTestDispatcher()) {
         val (alice, bob) = pair(backgroundScope)
         alice.engine.addRule(allowConnectRule())

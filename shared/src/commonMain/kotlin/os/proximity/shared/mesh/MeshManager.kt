@@ -710,8 +710,15 @@ class MeshManager(
     private suspend fun onIncoming(message: IncomingMessage) {
         val frame = Frame.decode(message.payload) ?: return
         val context = mutex.withLock {
-            links.getOrPut(message.fromPeerAddress) { LinkContext(message.fromPeerAddress) }
-        }
+            links[message.fromPeerAddress] ?: run {
+                // A never-before-seen address is refused outright once the
+                // cap is reached, rather than evicting something else to
+                // make room — an address already worth tracking (however it
+                // got there) keeps its slot.
+                if (links.size >= MAX_CONCURRENT_LINKS) return@withLock null
+                LinkContext(message.fromPeerAddress).also { links[message.fromPeerAddress] = it }
+            }
+        } ?: return
         val assembled = context.assembler.offer(frame, currentTimeMillis()) ?: return
 
         when (assembled.type) {
@@ -1052,5 +1059,21 @@ class MeshManager(
     companion object {
         private const val MAX_MESSAGE_LENGTH = 4000
         private const val MAX_PENDING_SEALED = 32
+
+        /**
+         * Ceiling on distinct addresses [links] will track at once.
+         *
+         * `onIncoming` creates an entry for *any* address that sends *any*
+         * frame — before that frame is validated, decoded, or attributed to
+         * an identity, since chunk reassembly needs somewhere to hold state
+         * across calls. Without a cap, a flood from constantly-rotating
+         * addresses (see docs/THREAT_MODEL.md #3, Sybil / identity flooding)
+         * would grow this map without bound regardless of the per-peer rate
+         * limit in the Guardrail Engine, which only ever sees a request
+         * *after* a frame has already been reassembled into something
+         * meaningful. New addresses are refused outright once at the cap;
+         * addresses already tracked are never evicted to make room.
+         */
+        private const val MAX_CONCURRENT_LINKS = 40
     }
 }
