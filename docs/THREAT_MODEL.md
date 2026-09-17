@@ -116,6 +116,9 @@ Forcing radio activity or work to drain a target.
   covers connection-attempt flooding (`CONNECT_PEER` is inbound and
   peer-attributed before the handshake even completes) as well as
   post-handshake message/list/file/status floods.
+- The nearby-peer list no longer grows without bound over a long session:
+  a peer absent from a scan cycle with no active link is dropped, rather
+  than accumulating forever as "in range" (see `MeshManager.mergeDiscovered`).
 
 **Gap:** the rate limit is a fixed budget per peer identifier, not
 adaptive to battery level, and there is still no battery-aware

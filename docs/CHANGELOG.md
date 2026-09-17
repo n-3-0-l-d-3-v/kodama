@@ -289,3 +289,18 @@ listed here — this tracks meaningful progress, not every file touched.
   behaviour, plus engine-level tests proving a flood is throttled, the
   budget resets after the window elapses, the limit is per-peer rather
   than global, and outbound actions are never throttled.
+
+**Nearby-peer list leak**
+
+- `mergeDiscovered` only ever added or updated entries from a scan cycle,
+  never removed one — every device ever seen nearby stayed listed as "in
+  range" forever, growing without bound over a long session (a real memory
+  and UI-correctness bug, and part of the same battery/resource concern as
+  the rate limiter above).
+- Fixed: a peer absent from the current scan with no active link is now
+  dropped. A peer that's connecting, handshaking, or already secured is
+  kept regardless of what the scan reports, since BLE doesn't reliably
+  re-advertise a device it already holds a GATT connection to — a single
+  missed scan cycle must never make a connected peer vanish from the screen.
+- 2 new integration tests: a peer walking out of range disappears from the
+  list; a secured peer survives a scan cycle that fails to re-report it.
