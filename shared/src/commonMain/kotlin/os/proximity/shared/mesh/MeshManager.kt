@@ -170,6 +170,7 @@ class MeshManager(
     }
 
     private suspend fun mergeDiscovered(discovered: List<DiscoveredPeer>) = mutex.withLock {
+        val discoveredAddresses = discovered.map { it.transportAddress }.toSet()
         val byAddress = peersState.value.associateBy { it.transportAddress }.toMutableMap()
         discovered.forEach { found ->
             val existing = byAddress[found.transportAddress]
@@ -181,10 +182,21 @@ class MeshManager(
                 displayName = existing?.displayName ?: found.displayName
             )
         }
+
+        // A peer that has fallen out of scan range is dropped from the list,
+        // unless we still hold an active link to it — a single missed scan
+        // cycle should never make a connected (or connecting) peer vanish
+        // from the screen. Without this, every device ever seen accumulates
+        // here forever, "in range" long after it has walked away.
+        byAddress.values.retainAll { it.transportAddress in discoveredAddresses || isLinkActive(it.linkState) }
+
         peersState.value = byAddress.values.sortedWith(
             compareByDescending<Peer> { it.isSecured }.thenByDescending { it.lastSeenEpochMillis }
         )
     }
+
+    private fun isLinkActive(state: LinkState): Boolean =
+        state == LinkState.CONNECTING || state == LinkState.HANDSHAKING || state == LinkState.SECURED
 
     // --------------------------------------------------------------- connecting
 

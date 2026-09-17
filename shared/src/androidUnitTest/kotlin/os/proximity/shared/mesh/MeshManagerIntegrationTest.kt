@@ -69,6 +69,11 @@ class MeshManagerIntegrationTest {
             peersState.value = emptyList()
         }
 
+        /** Lets a test simulate a scan cycle reporting arbitrary results directly. */
+        fun reportDiscovered(peers: List<DiscoveredPeer>) {
+            peersState.value = peers
+        }
+
         override suspend fun connect(peerAddress: String): Boolean = true
 
         override fun disconnect(peerAddress: String) = Unit
@@ -335,6 +340,44 @@ class MeshManagerIntegrationTest {
         assertTrue(ActionType.CONNECT_PEER in aliceActions)
         assertTrue(ActionType.SEND_MESSAGE in aliceActions)
         assertTrue(ActionType.RECEIVE_MESSAGE in bobActions)
+    }
+
+    @Test
+    fun aPeerThatFallsOutOfScanRangeDisappearsFromTheList() = runTest(UnconfinedTestDispatcher()) {
+        val (alice, bob) = pair(backgroundScope)
+
+        alice.transport.reportDiscovered(listOf(DiscoveredPeer("BB:BB:BB:BB:BB:BB", "Bob", -50, 1_000)))
+        advanceUntilIdle()
+        assertTrue(alice.manager.peers.value.any { it.transportAddress == "BB:BB:BB:BB:BB:BB" })
+
+        // Bob walks out of range: the next scan cycle no longer reports him.
+        // Without pruning, every device ever seen would linger forever.
+        alice.transport.reportDiscovered(emptyList())
+        advanceUntilIdle()
+
+        assertTrue(alice.manager.peers.value.none { it.transportAddress == "BB:BB:BB:BB:BB:BB" })
+    }
+
+    @Test
+    fun aSecuredPeerSurvivesAMissedScanCycle() = runTest(UnconfinedTestDispatcher()) {
+        val (alice, bob) = pair(backgroundScope)
+        alice.engine.addRule(allowConnectRule())
+        bob.engine.addRule(allowConnectRule())
+
+        alice.manager.startDiscovery()
+        alice.manager.connectTo("BB:BB:BB:BB:BB:BB")
+        advanceUntilIdle()
+        assertTrue(alice.manager.peers.value.any { it.isSecured }, "should be secured before the test proceeds")
+
+        // A scan cycle that fails to re-report an actively connected peer
+        // (common with BLE, which doesn't always re-advertise while a GATT
+        // connection is open) must not make it vanish from the screen.
+        alice.transport.reportDiscovered(emptyList())
+        advanceUntilIdle()
+
+        val stillThere = alice.manager.peers.value.firstOrNull { it.transportAddress == "BB:BB:BB:BB:BB:BB" }
+        assertNotNull(stillThere, "a secured peer must survive a missed scan cycle")
+        assertTrue(stillThere.isSecured)
     }
 }
 
