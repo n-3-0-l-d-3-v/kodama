@@ -340,3 +340,15 @@ listed here — this tracks meaningful progress, not every file touched.
 - `appendMessage` now applies the same 500-message bound live. New
   integration test sends 501 messages and confirms the newest 500 survive
   in memory, not just on disk.
+
+**Dead cleanup method**
+
+- `CapabilityRegistry.forgetPeer()` already existed, with its own unit
+  test, but nothing in production ever called it — every peer whose
+  capabilities were recorded stayed in `peerCapabilities` for the life of
+  the process. Harmless once expired (reads already filter expired
+  entries), but never actually cleared.
+- Added `forgetPeer()` to the `CapabilityDelegate` interface and call it
+  from `MeshManager.disconnect()`, the one place a secured session
+  actually ends. New integration test with a recording delegate confirms
+  it fires on disconnect and not before.
