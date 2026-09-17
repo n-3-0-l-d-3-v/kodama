@@ -174,6 +174,78 @@ class DefaultGuardrailEngineTest {
     }
 
     @Test
+    fun aPeerFloodingInboundRequestsIsThrottled() = runTest {
+        var clock = 0L
+        val log = InMemoryAuditLog()
+        val engine = DefaultGuardrailEngine(
+            log,
+            now = { clock },
+            maxInboundRequestsPerWindow = 3
+        )
+        val flood = request(
+            ActionType.RECEIVE_MESSAGE,
+            direction = RequestDirection.INBOUND,
+            peer = PeerContext("flooder", TrustState.UNVERIFIED)
+        )
+
+        repeat(3) { assertIs<GuardrailDecision.Allow>(engine.evaluate(flood)) }
+        val throttled = engine.evaluate(flood)
+
+        assertIs<GuardrailDecision.Deny>(throttled)
+        assertTrue(throttled.reason.isNotBlank())
+    }
+
+    @Test
+    fun theRateLimitBudgetResetsAfterTheWindowElapses() = runTest {
+        var clock = 0L
+        val engine = DefaultGuardrailEngine(
+            InMemoryAuditLog(),
+            now = { clock },
+            maxInboundRequestsPerWindow = 1,
+            rateLimitWindowMillis = 1_000
+        )
+        val flood = request(
+            ActionType.RECEIVE_MESSAGE,
+            direction = RequestDirection.INBOUND,
+            peer = PeerContext("flooder", TrustState.UNVERIFIED)
+        )
+
+        assertIs<GuardrailDecision.Allow>(engine.evaluate(flood))
+        assertIs<GuardrailDecision.Deny>(engine.evaluate(flood))
+
+        clock += 1_000
+
+        assertIs<GuardrailDecision.Allow>(engine.evaluate(flood))
+    }
+
+    @Test
+    fun theRateLimitIsPerPeerNotGlobal() = runTest {
+        val engine = DefaultGuardrailEngine(InMemoryAuditLog(), maxInboundRequestsPerWindow = 1)
+        val fromA = request(
+            ActionType.RECEIVE_MESSAGE,
+            direction = RequestDirection.INBOUND,
+            peer = PeerContext("peer-a", TrustState.UNVERIFIED)
+        )
+        val fromB = fromA.copy(peer = PeerContext("peer-b", TrustState.UNVERIFIED))
+
+        assertIs<GuardrailDecision.Allow>(engine.evaluate(fromA))
+        assertIs<GuardrailDecision.Deny>(engine.evaluate(fromA))
+        assertIs<GuardrailDecision.Allow>(engine.evaluate(fromB), "peer-b's budget must be independent of peer-a's")
+    }
+
+    @Test
+    fun outboundRequestsAreNeverRateLimited() = runTest {
+        val engine = DefaultGuardrailEngine(InMemoryAuditLog(), maxInboundRequestsPerWindow = 1)
+        val ourOwnSend = request(
+            ActionType.SEND_MESSAGE,
+            direction = RequestDirection.OUTBOUND,
+            peer = PeerContext("peer-a", TrustState.UNVERIFIED)
+        )
+
+        repeat(5) { assertIs<GuardrailDecision.Allow>(engine.evaluate(ourOwnSend)) }
+    }
+
+    @Test
     fun deniedReasonsAreHumanReadable() = runTest {
         val (engine, _) = engine()
         val decision = engine.evaluate(request(ActionType.SHARE_LOCATION))

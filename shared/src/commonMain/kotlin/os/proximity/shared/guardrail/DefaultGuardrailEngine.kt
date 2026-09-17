@@ -8,6 +8,9 @@ import os.proximity.shared.util.currentTimeMillis
  * The reference [GuardrailEngine] implementation. Evaluation order, per
  * docs/GUARDRAIL_POLICY.md:
  *
+ * 0. Per-peer inbound rate limit — cannot be disabled, same as the safety
+ *    floor, and checked first so a flood is throttled before it costs a
+ *    rule evaluation or an AskUser prompt (docs/THREAT_MODEL.md #6).
  * 1. Hard-coded safety floor — cannot be disabled by user configuration.
  * 2. User-defined [PolicyRule]s, highest [PolicyRule.priority] first.
  * 3. Category default for the request's [ActionType].
@@ -15,11 +18,15 @@ import os.proximity.shared.util.currentTimeMillis
  * Every evaluated request is appended to [auditLog], regardless of outcome.
  */
 class DefaultGuardrailEngine(
-    private val auditLog: AuditLog
+    private val auditLog: AuditLog,
+    now: () -> Long = { currentTimeMillis() },
+    maxInboundRequestsPerWindow: Int = 50,
+    rateLimitWindowMillis: Long = 10_000
 ) : GuardrailEngine {
 
     private val mutex = Mutex()
     private val userRules = mutableListOf<PolicyRule>()
+    private val rateLimiter = RateLimiter(maxInboundRequestsPerWindow, rateLimitWindowMillis, now)
 
     suspend fun addRule(rule: PolicyRule) = mutex.withLock {
         userRules.add(rule)
@@ -32,7 +39,8 @@ class DefaultGuardrailEngine(
     suspend fun rules(): List<PolicyRule> = mutex.withLock { userRules.toList() }
 
     override suspend fun evaluate(request: GuardrailRequest): GuardrailDecision {
-        val decision = SAFETY_FLOOR.firstOrNull { it.matches(request) }?.decide?.invoke(request)
+        val decision = rateLimitDenial(request)
+            ?: SAFETY_FLOOR.firstOrNull { it.matches(request) }?.decide?.invoke(request)
             ?: mutex.withLock { userRules.sortedByDescending { it.priority } }
                 .firstOrNull { it.matches(request) }
                 ?.decide
@@ -49,6 +57,22 @@ class DefaultGuardrailEngine(
         )
 
         return decision
+    }
+
+    /**
+     * Only inbound requests are throttled — an outbound action is this
+     * device's own choice, and there is no one else to protect it from.
+     * Requests with no peer (e.g. DISCOVER_PEER) aren't attributable to
+     * anyone and so cannot be throttled per-peer.
+     */
+    private suspend fun rateLimitDenial(request: GuardrailRequest): GuardrailDecision? {
+        if (request.direction != RequestDirection.INBOUND) return null
+        val peerId = request.peer?.deviceId ?: return null
+        if (rateLimiter.tryAcquire(peerId)) return null
+        return GuardrailDecision.Deny(
+            "This device is sending requests too quickly, so it's been temporarily " +
+                "throttled to protect your battery and stop it from flooding you with prompts."
+        )
     }
 
     companion object {
