@@ -129,7 +129,12 @@ class MeshManagerIntegrationTest {
     private fun node(name: String, address: String, scope: CoroutineScope): Node {
         val transport = LoopbackTransport(address)
         val auditLog = InMemoryAuditLog()
-        val engine = DefaultGuardrailEngine(auditLog)
+        // The per-peer rate limit (docs/THREAT_MODEL.md #6) is exercised by
+        // its own dedicated tests in the guardrail package; a high ceiling
+        // here keeps it from interfering with tests that legitimately send
+        // many messages in a single (real-clock, effectively instantaneous)
+        // test run.
+        val engine = DefaultGuardrailEngine(auditLog, maxInboundRequestsPerWindow = 10_000)
         val manager = MeshManager(
             transport = transport,
             primitives = primitives,
@@ -269,6 +274,32 @@ class MeshManagerIntegrationTest {
 
         assertNotNull(received)
         assertEquals(longBody, received.body)
+    }
+
+    @Test
+    fun conversationHistoryIsTrimmedInMemoryNotJustOnDisk() = runTest(UnconfinedTestDispatcher()) {
+        val (alice, bob) = pair(backgroundScope)
+        alice.engine.addRule(allowConnectRule())
+        bob.engine.addRule(allowConnectRule())
+
+        alice.manager.startDiscovery()
+        alice.manager.connectTo("BB:BB:BB:BB:BB:BB")
+        advanceUntilIdle()
+
+        val bobDeviceId = assertNotNull(
+            alice.manager.peers.value.firstOrNull { it.isSecured }?.deviceId
+        )
+
+        // One more than FileConversationStore's own trim bound (500), so
+        // this only passes if the live in-memory state is trimmed too, not
+        // just what eventually gets written to disk.
+        repeat(501) { i -> alice.manager.sendChat(bobDeviceId, "message $i") }
+        advanceUntilIdle()
+
+        val messages = bob.manager.conversations.value.values.single().messages
+        assertEquals(500, messages.size)
+        assertEquals("message 500", messages.last().body, "the newest message must be the one kept")
+        assertTrue(messages.none { it.body == "message 0" }, "the oldest message should have been evicted")
     }
 
     @Test

@@ -1016,7 +1016,13 @@ class MeshManager(
         val conversation = conversationsState.value[peerDeviceId] ?: return
         if (conversation.messages.any { it.id == message.id }) return
         conversationsState.value = conversationsState.value + (
-            peerDeviceId to conversation.copy(messages = conversation.messages + message)
+            peerDeviceId to conversation.copy(
+                // FileConversationStore trims to the same bound on every
+                // save, but that only limits what's *persisted* — without
+                // trimming here too, a single long-running session's live
+                // state would grow without bound between saves.
+                messages = (conversation.messages + message).takeLast(MAX_MESSAGES_IN_MEMORY)
+            )
             )
     }
 
@@ -1059,6 +1065,13 @@ class MeshManager(
     companion object {
         private const val MAX_MESSAGE_LENGTH = 4000
         private const val MAX_PENDING_SEALED = 32
+
+        /**
+         * Matches [os.proximity.shared.domain.FileConversationStore]'s
+         * default trim, so a live session's memory use doesn't outgrow what
+         * gets persisted anyway.
+         */
+        private const val MAX_MESSAGES_IN_MEMORY = 500
 
         /**
          * Ceiling on distinct addresses [links] will track at once.
