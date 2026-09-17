@@ -282,6 +282,7 @@ class MeshManager(
             updatePeer(address) {
                 it.copy(linkState = LinkState.FAILED, statusDetail = "Handshake could not be sent.")
             }
+            forgetLink(address)
         }
         return sent
     }
@@ -289,12 +290,25 @@ class MeshManager(
     fun disconnect(address: String) {
         transport.disconnect(address)
         scope.launch {
-            mutex.withLock { links.remove(address) }
+            forgetLink(address)
             updatePeer(address) {
                 it.copy(linkState = LinkState.DISCONNECTED, statusDetail = null)
             }
         }
     }
+
+    /**
+     * Drops the internal connection bookkeeping for an address once it is no
+     * longer of any use — a failed handshake, a denied or declined inbound
+     * connection, a failed outbound send. [peersState] (the user-facing
+     * "nearby" list) is updated separately and kept regardless, since
+     * showing *why* a connection failed is useful; `links` holds only the
+     * live connection machinery (buffers, session, handshake state), which
+     * has no reason to survive a connection that is already over. Without
+     * this, every attempt ever made — including ones a peer or policy
+     * refused — would sit in memory for the lifetime of the process.
+     */
+    private suspend fun forgetLink(address: String) = mutex.withLock { links.remove(address) }
 
     // ------------------------------------------------------------ user decisions
 
@@ -749,6 +763,7 @@ class MeshManager(
             is GuardrailDecision.Deny -> {
                 eventsFlow.emit(MeshEvent.Blocked(decision.reason))
                 transport.disconnect(context.address)
+                forgetLink(context.address)
             }
 
             is GuardrailDecision.AskUser -> askUser(
@@ -758,7 +773,10 @@ class MeshManager(
                 peerLabel = peerLabelFor(context.address),
                 peerFingerprint = null,
                 onAllow = { respondToHandshake(context, envelope) },
-                onDeny = { transport.disconnect(context.address) }
+                onDeny = {
+                    transport.disconnect(context.address)
+                    forgetLink(context.address)
+                }
             )
         }
     }
@@ -950,12 +968,10 @@ class MeshManager(
         peersState.value.firstOrNull { it.transportAddress == address }?.label ?: address
 
     private suspend fun failLink(context: LinkContext, reason: String) {
-        context.state = LinkState.FAILED
-        context.session = null
-        context.handshake = null
         updatePeer(context.address) {
             it.copy(linkState = LinkState.FAILED, statusDetail = reason)
         }
+        forgetLink(context.address)
         eventsFlow.emit(MeshEvent.Blocked(reason))
     }
 
