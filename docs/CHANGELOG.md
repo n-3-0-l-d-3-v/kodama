@@ -304,3 +304,26 @@ listed here — this tracks meaningful progress, not every file touched.
   missed scan cycle must never make a connected peer vanish from the screen.
 - 2 new integration tests: a peer walking out of range disappears from the
   list; a secured peer survives a scan cycle that fails to re-report it.
+
+**Internal connection-state leaks**
+
+- `links` (per-address session/handshake/frame-buffer bookkeeping) was
+  only ever cleared by the public `disconnect()` method. A failed
+  handshake, a denied inbound connection, a user-declined connection, or a
+  failed outbound send all left their entry behind forever — every attempt
+  anyone ever made, accepted or not, sat in memory for the life of the
+  process. New `forgetLink()` centralizes removal and is now called from
+  all four of those paths.
+- With that fixed, it became safe to close the matching gap in
+  docs/THREAT_MODEL.md #3 (Sybil / identity flooding): `onIncoming`
+  created an entry for *any* address sending *any* frame, before that
+  frame was validated or attributed to an identity, which meant a flood
+  from constantly-rotating addresses grew memory without bound and
+  bypassed the per-peer rate limit entirely (a new address always gets a
+  fresh limiter budget). `MAX_CONCURRENT_LINKS` (40) now refuses a
+  never-before-seen address once reached, without evicting anything
+  already tracked. Doing this before the leak fix above would have meant
+  the cap itself eventually locking out real peers after enough distinct
+  encounters in a long session.
+- New integration test floods 41 distinct addresses and confirms the 41st
+  never reaches the Guardrail Engine at all, while the other 40 do.

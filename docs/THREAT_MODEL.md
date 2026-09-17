@@ -64,8 +64,18 @@ Identities are free to create by design (no account, no authority), so
 scarcity cannot be the defence. Instead, trust comes from human
 verification, and the UI never presents an unverified peer as trustworthy.
 
-**Gap:** nothing yet rate-limits how many distinct identities may be
-entertained from one radio neighbourhood, and routing does not yet weight
+- `MeshManager` caps how many distinct, never-before-seen transport
+  addresses it will track connection state for at once
+  (`MAX_CONCURRENT_LINKS`, 40). This closes the specific gap where a peer
+  rotating addresses could grow memory without bound and bypass the
+  per-peer rate limit entirely, since a new address always got a fresh
+  limiter budget too. A never-before-seen address is refused outright once
+  the cap is reached; addresses already tracked are never evicted to make
+  room for a new one.
+
+**Gap:** the cap bounds memory and prevents a rate-limit bypass, but it is
+still a flat number, not adaptive to how many distinct *identities* (as
+opposed to addresses) are actually nearby, and routing does not yet weight
 verified peers over unverified ones.
 
 ### 4. Bluetooth fingerprinting and tracking — *Partial*
