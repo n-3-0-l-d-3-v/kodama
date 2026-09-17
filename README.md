@@ -78,7 +78,10 @@ what this app just did, and why?*
   docs/adr/0005-encryption-at-rest.md. The record-format logic is fully
   tested; the real Keystore-backed cipher, like the Keystore identity key,
   cannot be unit-tested outside a device.
-- Conversation history that survives restarts, with bounded retention.
+- Conversation history that survives restarts, with bounded retention —
+  applied to the live in-memory state as well as what's persisted, so a
+  single long session can't outgrow the same 500-message-per-peer bound
+  as a restart would.
 - Group status / coordination board: short, self-expiring status updates
   ("at the north gate") broadcast to connected peers, with a
   verified-only policy option. Deliberately not persisted — a stale

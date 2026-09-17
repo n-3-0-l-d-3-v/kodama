@@ -327,3 +327,16 @@ listed here — this tracks meaningful progress, not every file touched.
   encounters in a long session.
 - New integration test floods 41 distinct addresses and confirms the 41st
   never reaches the Guardrail Engine at all, while the other 40 do.
+
+**Unbounded live conversation history**
+
+- `FileConversationStore.save()` trims to 500 messages per peer on every
+  write, but `MeshManager`'s own in-memory `conversationsState` — what the
+  UI actually renders — was never trimmed at all, so a single
+  long-running session's memory grew without bound between saves
+  regardless of what eventually landed on disk. Found the same way as the
+  two leaks above: checking README's "bounded retention" claim against
+  the code and finding it true only for the persisted copy.
+- `appendMessage` now applies the same 500-message bound live. New
+  integration test sends 501 messages and confirms the newest 500 survive
+  in memory, not just on disk.
