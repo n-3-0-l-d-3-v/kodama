@@ -352,3 +352,16 @@ listed here — this tracks meaningful progress, not every file touched.
   from `MeshManager.disconnect()`, the one place a secured session
   actually ends. New integration test with a recording delegate confirms
   it fires on disconnect and not before.
+
+**Capability coverage gap**
+
+- Lists, files, and status all had an end-to-end integration test proving
+  their envelope survives the real handshake/encryption/guardrail
+  pipeline — capabilities were the one feature missing that layer, unit
+  tested only against the registry in isolation. It's exactly the layer
+  that would have caught the `forgetPeer()` gap above.
+- New `CapabilityIntegrationTest`: capabilities enabled before connecting
+  are advertised automatically on handshake, a capability never enabled
+  is never offered, an advertised capability expires after its lifetime,
+  a recipient's policy can block advertisements entirely, and
+  disconnecting forgets the peer's capabilities.
