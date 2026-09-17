@@ -268,3 +268,24 @@ listed here — this tracks meaningful progress, not every file touched.
 - Android: a status composer on the Nearby screen's identity card, and each
   connected peer's current status shown inline on their row; wired through
   the ViewModel with a 60-second purge ticker.
+
+## Phase 4 — Hardening & Polish (in progress)
+
+**Per-peer rate limiting**
+
+- Closes part of the gap named in docs/THREAT_MODEL.md #6: nothing
+  previously stopped a peer from flooding connection attempts or messages,
+  costing this device unbounded CPU, battery, and — worse — unbounded
+  AskUser prompts, before any policy rule ever got a chance to say no.
+- New `RateLimiter`: a fixed-window counter per peer, checked in
+  `DefaultGuardrailEngine` before the safety floor, since it's equally
+  non-negotiable. Default: 50 inbound requests per 10 seconds per peer.
+  Only inbound requests are throttled — an outbound action is this
+  device's own choice, with no one else to protect it from.
+- Covers connection-attempt flooding as well as post-handshake message,
+  list, file, and status floods, since all of them funnel through the same
+  `GuardrailEngine.evaluate()` choke point.
+- 9 new tests: the limiter's own window/reset/per-key-independence
+  behaviour, plus engine-level tests proving a flood is throttled, the
+  budget resets after the window elapses, the limit is per-peer rather
+  than global, and outbound actions are never throttled.

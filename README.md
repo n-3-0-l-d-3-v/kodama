@@ -89,6 +89,9 @@ what this app just did, and why?*
 - Bluetooth LE transport: symmetric scan/advertise, GATT client and server,
   serialised writes, MTU negotiation.
 - UI: onboarding, nearby devices, chat, audit log, and policy settings.
+- Per-peer inbound rate limiting in the Guardrail Engine (50 requests /
+  10s per peer, non-configurable by the user), closing part of the
+  battery-exhaustion gap in docs/THREAT_MODEL.md #6.
 
 **Not built yet**
 

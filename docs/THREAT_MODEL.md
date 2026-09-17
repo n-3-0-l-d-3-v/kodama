@@ -110,9 +110,21 @@ Forcing radio activity or work to drain a target.
 - In-flight message count and reassembly memory are capped per peer.
 - Connection and write operations have timeouts, so a peer cannot pin
   resources by stalling.
+- `RateLimiter` caps inbound requests to 50 per 10 seconds per peer,
+  enforced in the Guardrail Engine ahead of the safety floor so a flood is
+  refused before it costs a rule evaluation or an AskUser prompt. This
+  covers connection-attempt flooding (`CONNECT_PEER` is inbound and
+  peer-attributed before the handshake even completes) as well as
+  post-handshake message/list/file/status floods.
 
-**Gap:** no per-peer rate limiting or connection-attempt backoff, and no
-battery-aware degradation (e.g. ceasing to relay below a threshold).
+**Gap:** the rate limit is a fixed budget per peer identifier, not
+adaptive to battery level, and there is still no battery-aware
+degradation (e.g. ceasing to relay below a threshold). A peer that
+disconnects and reconnects with the same identity resets nothing — its
+window is keyed by ID, not connection — but one that changes its BLE
+address before the handshake completes gets a fresh budget under the
+`CONNECT_PEER` key, since that key is the transport address, not a
+device ID, until identity is proven.
 
 ### 7. Regaining internet connectivity — *Open*
 
