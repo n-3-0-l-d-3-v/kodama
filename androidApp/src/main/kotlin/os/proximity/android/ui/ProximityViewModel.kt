@@ -127,11 +127,16 @@ class ProximityViewModel(
 
         // The board only filters expiry on read (currentStatus), so this
         // ticker exists purely to make staleness show up in the UI without
-        // the user having to interact with anything first.
+        // the user having to interact with anything first. FileTransferManager
+        // has the same need — docs/adr/0004-file-transfer.md calls for expiry
+        // to be "swept ... via an explicit purgeExpired() call", but until
+        // now nothing in the app ever made that call during a running
+        // session; only the sweep in load() (once, at startup) ever ran.
         viewModelScope.launch {
             while (true) {
                 delay(60_000)
                 statusBoard.purgeExpired()
+                fileTransfer.purgeExpired()
             }
         }
     }
