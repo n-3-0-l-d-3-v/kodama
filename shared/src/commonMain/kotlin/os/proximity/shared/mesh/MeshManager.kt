@@ -290,10 +290,14 @@ class MeshManager(
     fun disconnect(address: String) {
         transport.disconnect(address)
         scope.launch {
+            val peerDeviceId = mutex.withLock { links[address]?.session?.peerDeviceId }
             forgetLink(address)
             updatePeer(address) {
                 it.copy(linkState = LinkState.DISCONNECTED, statusDetail = null)
             }
+            // Only a session that actually completed a handshake could have
+            // exchanged capabilities in the first place.
+            if (peerDeviceId != null) capabilities?.forgetPeer(peerDeviceId)
         }
     }
 

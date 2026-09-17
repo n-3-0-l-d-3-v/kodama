@@ -115,7 +115,7 @@ class CapabilityRegistry(
         peerState.value = peerState.value + (peerDeviceId to accepted)
     }
 
-    fun forgetPeer(peerDeviceId: String) {
+    override fun forgetPeer(peerDeviceId: String) {
         peerState.value = peerState.value - peerDeviceId
     }
 

@@ -9,6 +9,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
+import os.proximity.shared.capability.CapabilityAdvertisement
 import os.proximity.shared.crypto.AndroidCryptoPrimitives
 import os.proximity.shared.domain.DeliveryState
 import os.proximity.shared.domain.LinkState
@@ -274,6 +275,53 @@ class MeshManagerIntegrationTest {
 
         assertNotNull(received)
         assertEquals(longBody, received.body)
+    }
+
+    private class RecordingCapabilityDelegate : CapabilityDelegate {
+        val forgottenPeers = mutableListOf<String>()
+        override fun buildAdvertisement(): CapabilityAdvertisement? = null
+        override fun onPeerAdvertisement(peerDeviceId: String, advertisement: CapabilityAdvertisement) = Unit
+        override fun forgetPeer(peerDeviceId: String) {
+            forgottenPeers.add(peerDeviceId)
+        }
+    }
+
+    @Test
+    fun disconnectingAPeerForgetsItsCapabilities() = runTest(UnconfinedTestDispatcher()) {
+        val bob = node("Bob", "BB:BB:BB:BB:BB:BB", backgroundScope)
+        bob.manager.start()
+        bob.engine.addRule(allowConnectRule())
+
+        val aliceTransport = LoopbackTransport("AA:AA:AA:AA:AA:AA")
+        val aliceCapabilities = RecordingCapabilityDelegate()
+        val aliceEngine = DefaultGuardrailEngine(InMemoryAuditLog(), maxInboundRequestsPerWindow = 10_000)
+        aliceEngine.addRule(allowConnectRule())
+        val aliceManager = MeshManager(
+            transport = aliceTransport,
+            primitives = primitives,
+            identityProvider = identityProvider(),
+            verifier = verifier,
+            guardrail = aliceEngine,
+            trustStore = InMemoryTrustStore(),
+            scope = backgroundScope,
+            displayName = { "Alice" },
+            capabilities = aliceCapabilities
+        )
+        aliceTransport.peer = bob.transport
+        bob.transport.peer = aliceTransport
+        aliceManager.start()
+
+        aliceManager.startDiscovery()
+        aliceManager.connectTo("BB:BB:BB:BB:BB:BB")
+        advanceUntilIdle()
+
+        val bobDeviceId = assertNotNull(aliceManager.peers.value.firstOrNull { it.isSecured }?.deviceId)
+        assertTrue(aliceCapabilities.forgottenPeers.isEmpty(), "nothing should be forgotten while still connected")
+
+        aliceManager.disconnect("BB:BB:BB:BB:BB:BB")
+        advanceUntilIdle()
+
+        assertEquals(listOf(bobDeviceId), aliceCapabilities.forgottenPeers)
     }
 
     @Test
