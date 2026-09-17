@@ -22,10 +22,10 @@ Every mediated action is represented as a `GuardrailRequest`:
 - `actionType`: e.g. `RECEIVE_FILE`, `SHARE_LOCATION`, `READ_CONTACTS`,
   `ADVERTISE_CAPABILITY`, `RELAY_MESSAGE`, `LEAVE_MESH` (attempt to reach the
   internet).
-- `origin`: the peer identity involved (if any), including its trust state
-  (unverified / verified) and currently held capabilities.
+- `peer`: the peer identity involved (if any), including its trust state
+  (unverified / verified) and currently granted capabilities.
 - `attributes`: action-specific data needed to evaluate rules (e.g. file
-  size, capability being requested, destination).
+  name, capability being requested).
 
 ## Decision model
 
@@ -42,10 +42,17 @@ evaluates to `Deny` by construction (default deny), not to `Allow`.
 
 ## Evaluation order
 
+0. **Per-peer inbound rate limit** — a fixed budget of inbound requests per
+   peer per time window (default: 50 per 10 seconds), enforced ahead of
+   everything else and, like the safety floor, not user-configurable. This
+   exists so a flood costs nothing beyond an immediate `Deny` — no rule
+   evaluation, and critically no `AskUser` prompt. Outbound actions are
+   never rate limited: they're this device's own choice, with no one else
+   to protect it from. See `RateLimiter` and docs/THREAT_MODEL.md #6.
 1. **Hard-coded safety floor** — a small set of rules that cannot be
    disabled by user configuration (e.g. "never allow shell-like or code
-   execution actions"). Checked first; a match here always short-circuits
-   to `Deny`.
+   execution actions"). Checked first among policy proper; a match here
+   always short-circuits to `Deny`.
 2. **User-defined rules**, evaluated in priority order (most specific /
    most recently added first). The first matching rule decides the
    outcome.
@@ -55,19 +62,26 @@ evaluates to `Deny` by construction (default deny), not to `Allow`.
    configured per category, not per action).
 
 Only one rule ever "wins" per request; there is no merging of partial
-allows.
+allows. Every stage still writes exactly one audit log entry per request —
+rate-limited, floor-denied, and normally-decided requests are all equally
+visible in the log.
 
-## Example user-facing rules
+## User-facing rules (`PolicyCatalog`)
 
-- Only accept files from previously verified people.
-- Never allow access to contacts, calendar, or precise location without
-  asking.
-- Maximum receivable file size: `N` MB.
-- Never allow shell-like or code execution actions. *(hard-coded floor,
-  not user-editable)*
-- Always ask before sharing location.
-- Only advertise capabilities I've explicitly enabled.
-- Block any request that tries to leave the local mesh without permission.
+What's actually shipped, each off by default unless noted, in
+`shared/guardrail/PolicyCatalog.kt`:
+
+- Auto-accept connections from people I've verified. *(on by default)*
+- Only accept files from people I've verified. *(on by default)*
+- Ignore messages from people I haven't verified.
+- Let me share my location, asking every time.
+- Help carry other people's messages. *(on by default; not yet acted on —
+  relay isn't implemented, see README "Not built yet")*
+- Only share lists with people I have verified.
+- Only share status updates with people I have verified.
+
+Plus the hard-coded floor and rate limit above, which aren't in this
+catalog because the user cannot turn them off.
 
 ## Audit log
 
@@ -79,6 +93,8 @@ it would itself be a `GuardrailRequest`).
 
 ## Status
 
-This is the design for Phase 2. Phase 0 ships only the `GuardrailEngine`
-interface and request/decision types in `shared/guardrail/`; the rule
-evaluator, audit log persistence, and UI live in later phases.
+Implemented. `DefaultGuardrailEngine` (`shared/guardrail/`) is this design
+as shipped, including the rule evaluator, per-peer rate limiting, and a
+durable audit log (`FileAuditLog`); the Rules screen in the Android app
+lets a user toggle each `PolicyCatalog` entry and read the audit log. See
+docs/CHANGELOG.md for the order features landed in.
